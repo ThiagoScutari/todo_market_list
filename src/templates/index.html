@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lista de Compras</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container mt-3">
+        <h1 class="mb-4 text-center">🛒 Lista de Compras</h1>
+
+        {% for categoria, itens in categorias.items() %}
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <span>{{ categoria }} ({{ itens|length }})</span>
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+            
+            <div class="product-list">
+                {% for item in itens %}
+                <div class="product-card" id="card-{{ item.id }}">
+                    <div class="product-info">
+                        <div class="fw-bold">{{ item.nome }}</div>
+                        <small class="text-muted">
+                            {{ item.detalhes }}
+                            {% if item.usuario %} • <i class="bi bi-person-fill"></i> {{ item.usuario }}{% endif %}
+                        </small>
+                    </div>
+                    <div class="product-checkbox">
+                        <input type="checkbox" id="item-{{ item.id }}" onchange="markItem({{ item.id }})">
+                        <label for="item-{{ item.id }}"></label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info text-center mt-5">
+            <h4>Sua lista está vazia! 🎉</h4>
+            <p>Mande um áudio no Telegram para adicionar itens.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        // Função para abrir/fechar a categoria
+        function toggleCategory(headerElement) {
+            headerElement.classList.toggle('active');
+            // Pega o próximo elemento irmão (que é a lista de produtos)
+            const productList = headerElement.nextElementSibling;
+            productList.classList.toggle('active');
+        }
+
+        // Função para marcar item (Visual por enquanto)
+        function markItem(itemId) {
+            const card = document.getElementById(`card-${itemId}`);
+            const checkbox = document.getElementById(`item-${itemId}`);
+            
+            if (checkbox.checked) {
+                // Efeito visual de "riscado"
+                card.style.opacity = '0.5';
+                card.style.textDecoration = 'line-through';
+            } else {
+                card.style.opacity = '1';
+                card.style.textDecoration = 'none';
+            }
+            
+            // TODO: Na próxima sprint, enviaremos um fetch() para o servidor aqui!
+        }
+        
+        // Opcional: Abrir a primeira categoria por padrão
+        document.addEventListener("DOMContentLoaded", () => {
+            const firstHeader = document.querySelector('.category-header');
+            if (firstHeader) {
+                toggleCategory(firstHeader);
+            }
+        });
+    </script>
+</body>
+</html>

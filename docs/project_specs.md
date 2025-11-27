@@ -45,7 +45,7 @@ O FamilyOS é um sistema híbrido de gestão doméstica inteligente, com foco in
 ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
 │   VISUALIZAÇÃO  │    │    MEMÓRIA       │    │  INTELIGÊNCIA    │
 │                 │    │                  │    │                  │
-│  • Notion       │◀──│  • SQLite        │◀──│  • Processamento  │
+│  • WEB          │◀──│  • SQLite        │◀──│  • Processamento  │
 │  • (Futuro Web) │    │  • SQLAlchemy    │    │  • Analytics     │
 │                 │    │  • Models        │    │                  │
 └─────────────────┘    └──────────────────┘    └──────────────────┘
@@ -53,14 +53,18 @@ O FamilyOS é um sistema híbrido de gestão doméstica inteligente, com foco in
 
 ### 3.2. Componentes do Sistema
 
-#### 3.2.1. Camada de Interface (Frontend)
-**Telegram Bot**
-- **Função:** Interface primária de entrada de dados
-- **Tecnologias:** Bot API, suporte a áudio e texto
-- **Características:**
-  - Reconhecimento de usuário (`message.from.first_name`)
-  - Suporte multimodal (voz/texto)
-  - Respostas em tempo real
+### 3.2.1. Camada de Interface (Frontend)
+**Telegram Bot (Input)**
+- Função: Interface primária de entrada rápida (Voz/Texto).
+
+**Web App Responsivo (Visualização & Controle)**
+- Função: Dashboard para visualização da lista no mercado e gestão financeira.
+- Stack: Flask Templates (Jinja2) + HTML5 + CSS (Bootstrap/Tailwind).
+- Características:
+  - Mobile-First (Focado no uso via celular no mercado).
+  - Checkboxes interativos para marcar itens comprados.
+  - Atualização em tempo real (AJAX/Fetch).
+  - Acesso via navegador (sem instalação de app).
 
 #### 3.2.2. Camada de Orquestração (Middleware)
 **n8n Workflow**
@@ -69,7 +73,7 @@ Workflow Principal:
   - Trigger: Telegram Message
   - Processamento:
       - Tipo: Audio/Text Detection
-      - Transcrição: OpenAI Whisper (para áudio)
+      - Transcrição: Gemini (para áudio)
       - Enriquecimento: Extração de metadados do usuário
   - Saída: HTTP Request para API Flask
 ```
@@ -261,12 +265,13 @@ except Exception as e:
 
 ## 5. Plano de Desenvolvimento e Evolução
 
-### 5.1. Sprint 3: Visualização e Consumo
-**Objetivo:** Interface de consumo dos dados
+### 5.1. Sprint 3: Frontend Web (Shopping List)
+**Objetivo:** Eliminar a dependência do Notion e criar interface própria.
 **Entregáveis:**
-- Integração com Notion API
-- Dashboard web simples
-- Funcionalidade "check-off" de itens
+- Rota `/` no Flask servindo o HTML.
+- Interface de Lista de Compras com Checkbox.
+- Botão para limpar itens comprados.
+- Filtro por Categoria (Hortifrúti, Padaria, etc.).
 
 ### 5.2. Sprint 4: Deploy de Produção
 **Objetivo:** Ambiente profissional

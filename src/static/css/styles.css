@@ -1,0 +1,95 @@
+/* Estilo Mobile-First Limpo */
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background-color: #f8f9fa;
+    padding-bottom: 80px; /* Espaço para footer se tiver */
+}
+
+.category-section {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+/* Título da Categoria clicável */
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background-color: #f1f3f5;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+    font-size: 1.2rem;
+    color: #adb5bd;
+}
+
+/* Classe para girar o ícone quando aberto */
+.category-header.active .toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* Lista de Produtos que será escondida */
+.product-list {
+    display: none; /* Começa escondido */
+}
+
+.product-list.active {
+    display: block; /* Aparece quando tem a classe active */
+}
+
+/* Card do Produto */
+.product-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+}
+
+.product-card:last-child {
+    border-bottom: none;
+}
+
+/* Checkbox "No-Zoom" */
+.product-checkbox input[type="checkbox"] {
+    display: none; /* Esconde o input feio */
+}
+
+.product-checkbox label {
+    display: block;
+    /* TAMANHO REDUZIDO AQUI */
+    width: 32px;
+    height: 32px;
+    border: 2px solid #ced4da;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+/* Estilo quando marcado */
+.product-checkbox input:checked + label {
+    background-color: #28a745; /* Verde sucesso */
+    border-color: #28a745;
+}
+
+/* Ícone de check (✓) */
+.product-checkbox input:checked + label::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 18px;
+}
