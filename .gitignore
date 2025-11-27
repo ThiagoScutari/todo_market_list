@@ -1,0 +1,13 @@
+# Arquivos de Sistema e Ambientes Virtuais
+venv/
+*.DS_Store
+.vscode/
+
+# Arquivos de Dados e Configurações Sensíveis
+# CRUCIAL: NÃO ENVIAR O BANCO DE DADOS E CHAVES DA API
+*.env
+*.db
+*.sqlite
+todo_market.db
+historico_v*.db
+__pycache__/
