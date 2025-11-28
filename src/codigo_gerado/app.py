@@ -9,13 +9,15 @@ from flask_sqlalchemy import SQLAlchemy
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from sqlalchemy.orm import joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_ # Importar or_
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Carregar variáveis de ambiente
 load_dotenv()
 
+# Configuração do App Flask
 app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'todo_market.db')
@@ -23,6 +25,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- MODELOS ---
+
 class Categoria(db.Model):
     __tablename__ = 'categorias'
     id = db.Column(db.Integer, primary_key=True)
@@ -65,13 +68,13 @@ class ListaItem(db.Model):
     unidade = db.relationship('UnidadeMedida')
     tipo_lista = db.relationship('TipoLista')
 
-# --- IA ---
+# --- CONFIGURAÇÃO DA IA ---
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.0)
 
 prompt_template = """
 Extraia os itens de compra. Retorne LISTA JSON.
-Converta nomes para singular e minúsculas.
-Exemplo: [{{"nome": "leite", "quantidade": 2, "unidade": "L", "categoria": "Padaria"}}]
+Converta todos os nomes de produtos estritamente para o SINGULAR e minúsculas (ex: Batatas -> batata).
+Exemplo: [{"nome": "leite", "quantidade": 2, "unidade": "L", "categoria": "Padaria"}]
 Campos: nome, quantidade (float), unidade (símbolo: kg, g, L, ml, un), categoria (Hortifrúti, Padaria, Carnes, Limpeza).
 Texto: {texto}
 """
@@ -79,6 +82,7 @@ prompt = ChatPromptTemplate.from_template(prompt_template)
 chain = prompt | model
 
 # --- ROTAS ---
+
 @app.route('/', methods=['GET'])
 def home():
     try:
@@ -101,12 +105,13 @@ def home():
                 'nome': item.produto.nome.title(),
                 'detalhes': f"{qtd}{und}" if und else str(qtd),
                 'usuario': item.usuario,
-                'status': item.status
+                'status': item.status # Adicionar status para o frontend
             })
             
         return render_template('index.html', categorias=categorias_view)
     except Exception as e:
-        return f"Erro: {str(e)}"
+        logging.error(f"Erro ao carregar home: {str(e)}")
+        return f"Erro ao carregar: {str(e)}"
 
 @app.route('/toggle_item/<int:item_id>', methods=['POST'])
 def toggle_item(item_id):
@@ -117,60 +122,74 @@ def toggle_item(item_id):
         db.session.commit()
         return jsonify({'status': 'success', 'novo_status': item.status})
     except Exception as e:
+        logging.error(f"Erro ao alternar item {item_id}: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/clear_cart', methods=['POST'])
 def clear_cart():
     try:
-        itens = ListaItem.query.filter_by(status='comprado').all()
-        for item in itens: item.status = 'finalizado'
+        itens_comprados = ListaItem.query.filter_by(status='comprado').all()
+        for item in itens_comprados:
+            item.status = 'finalizado'
         db.session.commit()
-        return jsonify({'status': 'success'}), 200
+        logging.info(f"{len(itens_comprados)} itens marcados como 'finalizado'.")
+        return jsonify({'status': 'success', 'message': f'{len(itens_comprados)} itens finalizados.'}), 200
     except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao limpar carrinho: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/magic', methods=['POST'])
 def magic_endpoint():
     data = request.get_json()
-    if not data or 'texto' not in data: return jsonify({"erro": "JSON inválido"}), 400
+    if not data or 'texto' not in data:
+        return jsonify({"erro": "JSON inválido"}), 400
 
     texto = data['texto']
     usuario = data.get('usuario', 'Anônimo')
     
     try:
-        # NLP
+        # 1. NLP
         res = chain.invoke({"texto": texto})
         clean_content = re.sub(r'```json|```', '', res.content).strip()
         
         try:
             dados = json.loads(clean_content)
         except:
+            # Tenta corrigir JSON inválido (ex: múltiplos objetos sem array)
             fixed = re.sub(r'}\s*{', '}, {', clean_content)
             dados = json.loads(f"[{fixed}]" if not fixed.startswith('[') else fixed)
 
         if isinstance(dados, dict): dados = [dados]
 
         itens_salvos = []
-        itens_ignorados = [] # Nova lista para feedback
-
         for item in dados:
+            # Buscas
             cat = Categoria.query.filter(Categoria.nome.ilike(f"%{item.get('categoria')}%")).first()
             und = UnidadeMedida.query.filter(UnidadeMedida.simbolo.ilike(f"{item.get('unidade')}")).first()
             
+            # Produto
             prod = Produto.query.filter(Produto.nome.ilike(item.get('nome'))).first()
             if not prod:
-                prod = Produto(nome=item.get('nome'), categoria_id=cat.id if cat else None, unidade_padrao_id=und.id if und else None)
+                prod = Produto(
+                    nome=item.get('nome'),
+                    categoria_id=cat.id if cat else None,
+                    unidade_padrao_id=und.id if und else None
+                )
                 db.session.add(prod)
-                db.session.flush()
+                db.session.flush() # Garante que prod.id esteja disponível
 
-            # Anti-Duplicidade
-            existe = ListaItem.query.filter(ListaItem.produto_id == prod.id, or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')).first()
-            
-            if existe:
-                logging.info(f"Ignorando duplicado: {prod.nome}")
-                itens_ignorados.append(prod.nome) # Adiciona à lista de ignorados
-                continue
+            # Lógica Anti-Duplicidade
+            existing_item = ListaItem.query.filter(
+                ListaItem.produto_id == prod.id,
+                or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')
+            ).first()
 
+            if existing_item:
+                logging.info(f"Item '{prod.nome}' (ID: {prod.id}) já existe com status 'pendente' ou 'comprado'. Ignorando adição.")
+                continue # Ignora a adição deste item
+
+            # Lista
             novo_item = ListaItem(
                 produto_id=prod.id,
                 quantidade=item.get('quantidade') or 1,
@@ -182,20 +201,11 @@ def magic_endpoint():
             itens_salvos.append(prod.nome)
 
         db.session.commit()
-        
-        # --- Construção da Mensagem Inteligente ---
-        partes_msg = []
-        if itens_salvos:
-            partes_msg.append(f"Adicionados: {', '.join(itens_salvos)}")
-        if itens_ignorados:
-            partes_msg.append(f"Já na lista: {', '.join(itens_ignorados)}")
-            
-        mensagem_final = " | ".join(partes_msg) if partes_msg else "Nenhum item novo identificado."
-
-        return jsonify({"message": mensagem_final}), 201
+        return jsonify({"message": f"Sucesso! Salvo: {', '.join(itens_salvos)}"}), 201
 
     except Exception as e:
         db.session.rollback()
+        logging.error(f"Erro no endpoint magic: {str(e)}")
         return jsonify({"erro": str(e)}), 500
 
 if __name__ == '__main__':

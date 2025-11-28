@@ -15,7 +15,7 @@ try:
 except:
     pass
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # Pasta src
 DOCS_DIR = os.path.join(os.path.dirname(BASE_DIR), "docs")
 CODIGO_DIR = os.path.join(BASE_DIR, "codigo_gerado")
 
@@ -23,35 +23,29 @@ for path in [DOCS_DIR, CODIGO_DIR]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-# --- RAG SIMPLIFICADO (Carregamento Automático) ---
+# --- RAG AUTOMÁTICO ---
 def carregar_contexto_docs():
-    """Lê todos os .md da pasta docs e retorna um stringão."""
-    contexto = "--- BASE DE CONHECIMENTO DO PROJETO ---\n"
+    contexto = "--- DOCUMENTAÇÃO TÉCNICA (LEIA APENAS SE NECESSÁRIO) ---\n"
     arquivos_md = glob.glob(os.path.join(DOCS_DIR, "*.md"))
-    
-    if not arquivos_md:
-        return contexto + "Nenhum documento encontrado na pasta docs."
-    
+    if not arquivos_md: return contexto + "Nenhum documento encontrado."
     for arquivo in arquivos_md:
-        nome = os.path.basename(arquivo)
         try:
             with open(arquivo, "r", encoding="utf-8") as f:
-                conteudo = f.read()
-                contexto += f"\n=== ARQUIVO: {nome} ===\n{conteudo}\n"
+                # Limitamos o tamanho para não estourar o contexto com atas velhas
+                conteudo = f.read()[-5000:] 
+                contexto += f"\n=== ARQUIVO: {os.path.basename(arquivo)} (Trecho Final) ===\n{conteudo}\n"
         except Exception as e:
-            print(f"Erro ao ler {nome}: {e}")
-            
+            print(f"Erro ao ler {arquivo}: {e}")
     return contexto
 
-# Carrega tudo na memória agora
 CONTEXTO_PROJETO = carregar_contexto_docs()
-print(f"📚 {len(CONTEXTO_PROJETO)} caracteres de documentação carregados na memória dos agentes.")
+print(f"📚 Contexto carregado.")
 
-conn = sqlite3.connect("memoria_v10_rag.db", check_same_thread=False)
+conn = sqlite3.connect("memoria_v11_fixed.db", check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)
 
-# Usando o modelo Lite
-model = init_chat_model("gemini-2.5-pro", model_provider="google_genai", temperature=0.3)
+# Forçando Lite para evitar bloqueios e alucinações criativas
+model = init_chat_model("gemini-2.5-flash", model_provider="google_genai", temperature=0.1)
 
 historico_sessao = []
 
@@ -71,133 +65,123 @@ def limpar_conteudo(conteudo):
 # --- 2. FERRAMENTAS ---
 
 @tool
+def ler_codigo_fonte(nome_arquivo: str) -> str:
+    """Lê o código ATUAL de um arquivo na pasta src."""
+    caminho = os.path.join(BASE_DIR, os.path.basename(nome_arquivo))
+    if not os.path.exists(caminho): return f"❌ Arquivo {nome_arquivo} não existe."
+    try:
+        with open(caminho, "r", encoding="utf-8") as f: return f.read()
+    except Exception as e: return f"❌ Erro: {e}"
+
+@tool
 def escrever_codigo(nome_arquivo: str, conteudo: str) -> str:
-    """Salva código na pasta 'codigo_gerado'. USE APENAS QUANDO TIVER CERTEZA DO CÓDIGO."""
+    """Salva código na pasta 'codigo_gerado'."""
     caminho = os.path.join(CODIGO_DIR, os.path.basename(nome_arquivo))
     try:
-        with open(caminho, "w", encoding="utf-8") as f:
-            f.write(conteudo)
-        return f"✅ Código salvo: {caminho}"
-    except Exception as e:
-        return f"❌ Erro: {e}"
+        with open(caminho, "w", encoding="utf-8") as f: f.write(conteudo)
+        return f"✅ Código salvo em codigo_gerado/{nome_arquivo}."
+    except Exception as e: return f"❌ Erro: {e}"
 
-# --- 3. AGENTES (Com Contexto Injetado) ---
+# --- 3. AGENTES ---
 
-# O Prompt do Sistema agora inclui o conteúdo dos arquivos
-prompt_base = f"""
-Você é um especialista parte da equipe FamilyOS.
-Abaixo está TODA a documentação do projeto. Você NÃO PRECISA ler arquivos, eles já estão aqui.
-Baseie suas respostas EXCLUSIVAMENTE nestes dados:
+prompt_base = f"Contexto:\n{CONTEXTO_PROJETO}"
 
-{CONTEXTO_PROJETO}
-"""
+alpha = create_agent(model, tools=[], system_prompt=f"{prompt_base}\nVocê é Alpha (Gerente).", checkpointer=checkpointer)
+architect = create_agent(model, tools=[ler_codigo_fonte], system_prompt=f"{prompt_base}\nVocê é Architect (Tech).", checkpointer=checkpointer)
+experience = create_agent(model, tools=[], system_prompt=f"{prompt_base}\nVocê é Experience (UX).", checkpointer=checkpointer)
 
-alpha = create_agent(
-    model, tools=[], 
-    system_prompt=f"{prompt_base}\nVocê é Alpha (Gerente). Coordene o debate e valide requisitos.", 
-    checkpointer=checkpointer
-)
-
-architect = create_agent(
-    model, tools=[], 
-    system_prompt=f"{prompt_base}\nVocê é Architect (Tech Lead). Valide Banco de Dados e Stack.", 
-    checkpointer=checkpointer
-)
-
-experience = create_agent(
-    model, tools=[], 
-    system_prompt=f"{prompt_base}\nVocê é Experience (UX). Valide a usabilidade.", 
-    checkpointer=checkpointer
-)
-
-# O Builder precisa da tool de escrita, mas também recebe o contexto para saber O QUE escrever
+# BUILDER BLINDADO (Prompt Agressivo)
 builder = create_agent(
-    model, tools=[escrever_codigo], 
-    system_prompt=f"{prompt_base}\nVocê é Builder (Dev). Sua função é escrever código. Use a tool 'escrever_codigo' quando ordenado.", 
+    model, 
+    tools=[escrever_codigo, ler_codigo_fonte], 
+    system_prompt=f"""
+    VOCÊ É O BUILDER. UM ROBÔ DE CODIFICAÇÃO.
+    
+    SUAS REGRAS DE OURO:
+    1. NÃO ESCREVA ATAS DE REUNIÃO.
+    2. NÃO CUMPRIMENTE O USUÁRIO.
+    3. SEU ÚNICO OBJETIVO É GERAR CÓDIGO.
+    4. Use a tool 'ler_codigo_fonte' para ver o arquivo atual.
+    5. Use a tool 'escrever_codigo' para salvar a nova versão.
+    6. Se não houver código para escrever, responda apenas: "Aguardando ordem de código."
+    """, 
     checkpointer=checkpointer
 )
 
-prompt_star = """
-Você é o Star (Relator). Gere uma Ata em Markdown baseada no log.
-Não invente. Se for curto, diga que foi curto.
-"""
-star = create_agent(model, tools=[], system_prompt=prompt_star, checkpointer=checkpointer)
+star = create_agent(
+    model, tools=[], 
+    system_prompt="Você é Star. Gere a Ata da reunião baseada no log.", 
+    checkpointer=checkpointer
+)
 
 # --- 4. FUNÇÕES ---
 
 def rodada_debate(user_input, config):
-    print("\n   📢 [SISTEMA]: Iniciando Debate (Agentes já leram a doc)...")
+    print("\n   📢 [SISTEMA]: Debate...")
     registrar_log("Usuario", user_input)
     
-    # Alpha
-    print(f"\n🔹 Alpha falando...")
     res = alpha.invoke({"messages": [{"role": "user", "content": user_input}]}, config=config)
-    msg_alpha = limpar_conteudo(res['messages'][-1].content)
-    print(f"🤖 Alpha: {msg_alpha}")
-    registrar_log("Alpha", msg_alpha)
+    msg = limpar_conteudo(res['messages'][-1].content)
+    print(f"🤖 Alpha: {msg}")
+    registrar_log("Alpha", msg)
     
-    # Architect
-    print(f"\n🔸 Architect complementando...")
-    res = architect.invoke({"messages": [{"role": "user", "content": "Com base na documentação que você já leu, qual a visão técnica?"}]}, config=config)
-    msg_arch = limpar_conteudo(res['messages'][-1].content)
-    print(f"🤖 Architect: {msg_arch}")
-    registrar_log("Architect", msg_arch)
-    
-    return f"{msg_alpha}\n{msg_arch}"
+    res = architect.invoke({"messages": [{"role": "user", "content": "Visão técnica?"}]}, config=config)
+    msg = limpar_conteudo(res['messages'][-1].content)
+    print(f"🤖 Architect: {msg}")
+    registrar_log("Architect", msg)
+
+    return msg
 
 def rodada_execucao(ordem, config):
     print("\n   🔨 [SISTEMA]: Builder ativado...")
     registrar_log("Usuario (Ordem)", ordem)
-    res = builder.invoke({"messages": [{"role": "user", "content": ordem}]}, config=config)
+    
+    # CORREÇÃO CRÍTICA: Prompt de Enquadramento
+    ordem_blindada = f"""
+    ORDEM TÉCNICA IMEDIATA:
+    {ordem}
+    
+    INSTRUÇÃO:
+    1. Leia o arquivo necessário usando 'ler_codigo_fonte'.
+    2. Escreva o novo código usando 'escrever_codigo'.
+    NÃO GERE TEXTO DE CONVERSA. APENAS USE AS FERRAMENTAS.
+    """
+    
+    # CORREÇÃO CRÍTICA: Usando a variável certa
+    res = builder.invoke({"messages": [{"role": "user", "content": ordem_blindada}]}, config=config)
+    
     msg_builder = limpar_conteudo(res['messages'][-1].content)
     print(f"🤖 Builder: {msg_builder}")
     registrar_log("Builder", msg_builder)
 
 def encerramento_inteligente(config):
-    print("\n" + "="*60)
-    if len(historico_sessao) < 2:
-        print("   🚫 Sessão curta demais. Nada salvo.")
-        sys.exit(0)
-
-    print("   🌟 [STAR]: Gerando Ata...")
-    log_completo = "\n".join(historico_sessao)
-    res = star.invoke({"messages": [{"role": "user", "content": f"Gere a ata:\n{log_completo}"}]}, config=config)
-    conteudo_md = limpar_conteudo(res['messages'][-1].content)
+    if len(historico_sessao) < 2: sys.exit(0)
+    print("\n   🌟 [STAR]: Gerando Ata...")
+    log = "\n".join(historico_sessao)
+    res = star.invoke({"messages": [{"role": "user", "content": f"Ata:\n{log}"}]}, config=config)
     
-    data_hoje = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    caminho = os.path.join(DOCS_DIR, f"Ata_{data_hoje}.md")
-    
-    with open(caminho, "w", encoding="utf-8") as f:
-        f.write(conteudo_md)
-    print(f"   💾 Salvo em: {caminho}")
+    caminho = os.path.join(DOCS_DIR, f"Ata_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.md")
+    with open(caminho, "w", encoding="utf-8") as f: f.write(str(res['messages'][-1].content))
+    print(f"   💾 Salvo: {caminho}")
     sys.exit(0)
 
 # --- 5. LOOP ---
-
-config = {"configurable": {"thread_id": "sessao_v10_rag_auto"}}
-
-print(f"\n--- 🏢 FamilyOS V10 (Contexto Carregado) ---")
+config = {"configurable": {"thread_id": "sessao_v11_fixed_2"}}
+print("\n--- 🏢 FamilyOS V11 (Builder Corrigido) ---")
 
 while True:
     try:
         print("\n" + "-"*60)
         user_input = input("👤 Você: ").strip()
         if not user_input: continue
-        
-        if user_input.lower() in ["sair", "exit"]:
-            encerramento_inteligente(config)
-            break
+        if user_input.lower() in ["sair", "exit"]: encerramento_inteligente(config)
 
         if any(user_input.lower().startswith(p) for p in ["builder", "crie", "gere"]):
             rodada_execucao(user_input, config)
         else:
-            resumo = rodada_debate(user_input, config)
-            print("\n   👉 Deseja acionar o Builder? (s/n)")
-            if input("   👤 Decisão: ").lower() == 's':
+            rodada_debate(user_input, config)
+            if input("\n   👉 Acionar Builder? (s/n): ").lower() == 's':
                 pedido = input("   📝 Ordem: ")
-                rodada_execucao(f"Contexto: {resumo}\nORDEM: {pedido}", config)
-
-    except KeyboardInterrupt:
-        encerramento_inteligente(config)
-    except Exception as e:
-        print(f"❌ Erro: {e}")
+                rodada_execucao(pedido, config)
+    except KeyboardInterrupt: encerramento_inteligente(config)
+    except Exception as e: print(f"❌ Erro: {e}")
