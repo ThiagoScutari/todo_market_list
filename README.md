@@ -5,22 +5,25 @@ O **FamilyOS** é um sistema híbrido de gestão doméstica inteligente, focado 
 
 ---
 
-## 💡 Visão Estratégica e Princípios
+## 💡 O Que Ele Faz? (Showcase)
 
-O projeto é guiado por um objetivo central: **Fricção Zero**.
-* **Na Entrada:** Basta falar ("Comprar leite") sem abrir apps complexos.
-* **Na Saída:** Uma interface web desenhada para uso com uma mão no supermercado.
+### 1. Você fala no Telegram (Voz ou Texto)
+O sistema aceita listas complexas e áudios com ingredientes misturados.
+![Interação Telegram](images/telegram.jpg)
 
-### Objetivos Principais
-* **Voice-to-Database:** Entrada de dados natural via Telegram.
-* **Mobile-First UX:** Interface web otimizada para compras rápidas.
-* **Inteligência Anti-Duplicidade:** O sistema entende se você já pediu o item.
+### 2. A Mágica Acontece (Backend + IA)
+O n8n orquestra a transcrição e envia para nossa API Python, que usa Gemini para estruturar os dados.
+![Fluxo n8n](images/n8n.png)
+
+### 3. A Lista Aparece Pronta (Web App)
+Uma interface mobile-first para usar no mercado, com agrupamento inteligente por categorias.
+![Interface Web](images/layout.png)
 
 ---
 
-## 🏗️ Arquitetura de Alto Nível (Sprint 4 - Concluída)
+## 🏗️ Arquitetura Técnica (Sprint 5 - Produção)
 
-A arquitetura evoluiu para um **Monólito Modular Inteligente**, onde o Flask gerencia tanto a API de inteligência quanto o Frontend de visualização.
+A arquitetura evoluiu para um **Monólito Modular Inteligente**, hospedado em VPS com Docker e Traefik.
 
 ```
 
@@ -28,7 +31,7 @@ A arquitetura evoluiu para um **Monólito Modular Inteligente**, onde o Flask ge
 │   INTERFACE     │    │   ORQUESTRADOR   │    │    CÉREBRO & FRONTEND     │
 │                 │    │                  │    │                           │
 │  • Telegram     │───▶│  • n8n           │───▶│  • Flask (API + Web)      │
-│  • (Voz/Texto)  │    │  • Whisper/Ngrok │    │  • Gemini AI (NLP)        │
+│  • (Voz/Texto)  │    │  • Whisper       │    │  • Gemini AI (NLP)        │
 └─────────────────┘    └──────────────────┘    │  • SQLAlchemy (DB)        │
 └─────────────┬─────────────┘
 │
@@ -37,7 +40,7 @@ A arquitetura evoluiu para um **Monólito Modular Inteligente**, onde o Flask ge
 │    MEMÓRIA       │
 │                  │
 │  • SQLite        │
-│                  │
+│  (Volume Docker) │
 └──────────────────┘
 
 ````
@@ -47,10 +50,11 @@ A arquitetura evoluiu para um **Monólito Modular Inteligente**, onde o Flask ge
 | Componente | Função | Tecnologias Chave |
 | :--- | :--- | :--- |
 | **Interface de Entrada** | Captura de áudio/texto | Telegram Bot API |
-| **Orquestrador** | Transcrição e Roteamento | n8n, OpenAI Whisper, Ngrok |
+| **Orquestrador** | Transcrição e Roteamento | n8n, OpenAI Whisper |
 | **Cérebro (NLP)** | Extração de itens e Categorização | Google Gemini 2.5 Flash-Lite, LangChain |
-| **Backend** | Regras de Negócio e Persistência | Python Flask, SQLAlchemy |
+| **Backend** | Regras de Negócio e Persistência | Python Flask, Gunicorn, SQLAlchemy |
 | **Frontend** | Visualização e Controle (Check-off) | HTML5, CSS3 (Mobile-First), Jinja2, JS Fetch |
+| **Infraestrutura** | Deploy e Segurança | Docker Compose, Traefik (Reverse Proxy + SSL) |
 
 ---
 
@@ -90,7 +94,7 @@ Para rodar o projeto localmente:
         ```
 
 3.  **Configurar Chaves (`.env`):**
-    * Crie um arquivo `.env` na raiz `src/` com suas chaves (Gemini, OpenAI).
+    * Crie um arquivo `.env` na raiz com suas chaves (GOOGLE_API_KEY).
 
 4.  **Inicializar Banco de Dados:**
     * Execute o script que cria o SQLite e popula as categorias base:
@@ -104,10 +108,6 @@ Para rodar o projeto localmente:
     ```
     * Acesse o Frontend: `http://localhost:5000`
 
-6.  **Conectar com a Nuvem (n8n):**
-    * Inicie o Ngrok: `ngrok http 5000`
-    * Atualize a URL no workflow do n8n.
-
 ---
 
 ## 🗺️ Roadmap de Desenvolvimento
@@ -118,8 +118,19 @@ Para rodar o projeto localmente:
 | **Sprint 2** | Integração (n8n + Ngrok + NLP) | ✅ Concluído |
 | **Sprint 3** | Frontend Web (Substituindo Notion) | ✅ Concluído |
 | **Sprint 4** | Interatividade e Persistência | ✅ Concluído |
-| **Sprint 5** | Deploy em Produção (VPS/Render) | 🚧 Próximo Passo |
+| **Sprint 5** | Deploy em Produção (Docker + VPS) | ✅ Concluído |
 
 ---
-**Desenvolvido com IA e Engenharia de Prompt.**
+**Desenvolvido por:** Thiago Scutari & Equipe de Agentes (Alpha, Architect, Builder, Star).
+**Tecnologia:** Python, AI, Automation.
 ````
+
+### 📤 Próximo Passo: Commit Final
+
+Não esqueça de enviar essas imagens para o Git também\!
+
+```powershell
+git add .
+git commit -m "docs: Atualiza README com imagens e arquitetura final"
+git push origin main
+```
