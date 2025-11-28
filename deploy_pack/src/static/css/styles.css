@@ -1,0 +1,189 @@
+/* GLOBAL */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #ffffff;
+    color: #333;
+    margin: 0;
+    padding-bottom: 100px; /* Espaço para o botão flutuante não cobrir o último item */
+}
+
+/* HEADER */
+header {
+    background-color: #fff;
+    padding: 1.2rem;
+    text-align: center;
+    border-bottom: 2px solid #f0f0f0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+header h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0;
+    color: #4a4a4a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+/* CONTAINER */
+.container {
+    padding: 0.5rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* CATEGORIAS (Fundo Cinza e Arredondado) */
+.category-section {
+    margin-bottom: 0.8rem;
+    background-color: #fff;
+    border: 1px solid #dee2e6; /* Borda sutil para definição */
+    border-radius: 12px;       /* Cantos arredondados */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* A sombra "pop-up" que você pediu */
+    overflow: hidden;          /* Garante que o conteúdo não vaze das bordas arredondadas */
+}
+.category-header {
+    background-color: #f1f3f5; /* Cinza claro da imagem */
+    padding: 14px 18px;
+    border-radius: 12px; /* Cantos arredondados */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    color: #495057;
+    cursor: pointer;
+    margin-bottom: 10px;
+    user-select: none;
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+    font-size: 0.9rem;
+}
+
+/* LISTA DE PRODUTOS */
+.product-list {
+    display: block; /* Padrão aberto */
+    padding: 0 4px; /* Leve recuo */
+}
+
+/* CARD DO PRODUTO (Linha divisória e Sombra) */
+.product-card {
+    background: #fff;
+    padding: 16px 8px; /* Espaçamento interno */
+    border-bottom: 1px solid #e9ecef; /* Linha divisória */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.product-card:last-child {
+    border-bottom: none;
+}
+
+/* Estado Riscado */
+.product-card.checked .product-name,
+.product-card.checked .product-meta {
+    opacity: 0.4;
+    text-decoration: line-through;
+}
+
+/* Tipografia do Item */
+.product-name {
+    font-size: 1.1rem;
+    font-weight: 700; /* Negrito como na imagem */
+    color: #212529;
+    margin-bottom: 4px;
+}
+
+.product-meta {
+    font-size: 0.9rem;
+    color: #868e96;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.separator {
+    font-size: 1.2rem;
+    line-height: 0;
+    margin-top: -2px;
+}
+
+/* CHECKBOX (Círculo Grande) */
+.product-checkbox {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    margin-right: 8px; /* Afastar um pouco da borda */
+}
+
+.product-checkbox input { display: none; }
+
+.product-checkbox label {
+    display: block;
+    width: 32px;
+    height: 32px;
+    border: 2px solid #ced4da;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.product-checkbox input:checked + label {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+/* Check branco */
+.product-checkbox input:checked + label::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 6px;
+    width: 8px;
+    height: 14px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+}
+
+/* BOTÃO VERMELHO NO RODAPÉ */
+footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(to top, #ffffff 90%, rgba(255,255,255,0));
+    padding: 20px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.btn-clear-large {
+    width: 100%;
+    max-width: 560px;
+    background-color: #ff3b30; /* Vermelho vibrante */
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.btn-clear-large:active {
+    transform: scale(0.98);
+}
+
+.empty-state {
+    text-align: center;
+    margin-top: 50px;
+}
