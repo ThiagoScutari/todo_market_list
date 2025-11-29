@@ -9,7 +9,7 @@ O **FamilyOS** é um sistema híbrido de gestão doméstica inteligente, focado 
 
 ### 1. Você fala no Telegram (Voz ou Texto)
 O sistema aceita listas complexas e áudios com ingredientes misturados.
-![Interação Telegram](images/telegram.jpg)
+![Interação Telegram](images/telegram.png)
 
 ### 2. A Mágica Acontece (Backend + IA)
 O n8n orquestra a transcrição e envia para nossa API Python, que usa Gemini para estruturar os dados.
