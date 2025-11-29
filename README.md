@@ -124,13 +124,3 @@ Para rodar o projeto localmente:
 **Desenvolvido por:** Thiago Scutari & Equipe de Agentes (Alpha, Architect, Builder, Star).
 **Tecnologia:** Python, AI, Automation.
 ````
-
-### 📤 Próximo Passo: Commit Final
-
-Não esqueça de enviar essas imagens para o Git também\!
-
-```powershell
-git add .
-git commit -m "docs: Atualiza README com imagens e arquitetura final"
-git push origin main
-```
