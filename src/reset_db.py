@@ -1,18 +1,30 @@
+import os
 from app import app, db, Categoria, UnidadeMedida, TipoLista, User
 
 def resetar_banco():
     with app.app_context():
+        # --- NOVO: Garante que o diretório de dados exista ---
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        db_dir = os.path.dirname(db_path)
+        if not os.path.exists(db_dir):
+            print(f"📂 Criando diretório de dados em: {db_dir}")
+            os.makedirs(db_dir)
+
         # 1. Apaga tudo e recria as tabelas
         print("🗑️  Apagando banco antigo...")
         db.drop_all()
         print("🔨 Criando novas tabelas...")
         db.create_all()
 
-        # 2. Cria Usuário ADMIN
-        print("👤 Criando usuário Admin...")
-        admin = User(username="admin")
-        admin.set_password("admin") # Senha padrão
-        db.session.add(admin)
+        # 2. Cria Usuários Fixos
+        print("👤 Criando usuários 'thiago' e 'debora'...")
+        # NOTA: Em um ambiente real, as senhas seriam hasheadas.
+        # Para esta sprint, estamos usando texto plano conforme solicitado.
+        user_thiago = User(username='thiago', password_hash='2904')
+        user_debora = User(username='debora', password_hash='1712')
+        
+        db.session.add(user_thiago)
+        db.session.add(user_debora)
 
         # 3. Insere Dados Iniciais (Seed)
         print("🌱 Semeando dados...")
@@ -45,7 +57,7 @@ def resetar_banco():
 
         db.session.commit()
         print("✅ Banco de dados recriado com sucesso!")
-        print("🔑 Login Inicial: admin / admin")
+        print("🔑 Usuários criados: thiago (senha: 2904), debora (senha: 1712)")
 
 if __name__ == "__main__":
     resetar_banco()

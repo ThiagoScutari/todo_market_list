@@ -1,144 +1,184 @@
-# 📘 Relatório Técnico Consolidado: FamilyOS (Versão 1.0)
+# 📘 Relatório Técnico Mestre: FamilyOS
 
-**Projeto:** ToDo Market & List (Módulo de Compras)
-**Status:** MVP Funcional em Produção (Local/Híbrido)
-**Data de Conclusão:** 27/11/2025
-**Objetivo Central:** Gestão doméstica com **Fricção Zero** (Voice-to-Database).
-
----
-
-## 1. Visão Geral da Arquitetura
-
-O FamilyOS opera sob uma arquitetura de **Microserviço Inteligente Híbrido**. Ele combina a facilidade de interfaces de nuvem com a privacidade e controle de um backend local.
-
-### O Fluxo de Dados (Pipeline)
-1.  **Coleta (Input):** O usuário envia áudio ou texto via **Telegram**.
-2.  **Orquestração (Nuvem):** O **n8n** recebe a mensagem, transcreve o áudio (via **OpenAI Whisper**) e identifica o usuário.
-3.  **Túnel (Conectividade):** O **Ngrok** transporta a requisição segura da nuvem para o servidor local (`localhost:5000`).
-4.  **Inteligência (Backend):** A API **Flask** recebe o texto bruto e aciona o **Google Gemini 2.5 Flash-Lite**.
-5.  **Processamento (NLP):** O Gemini extrai dados estruturados (Item, Qtd, Unidade, Categoria), normaliza para singular e remove duplicatas.
-6.  **Persistência (Banco):** O **SQLAlchemy** grava os dados relacionais no **SQLite**.
-7.  **Visualização (Frontend):** Uma Web App **Mobile-First** exibe a lista em tempo real para uso no mercado.
+**Projeto:** FamilyOS (Módulo Compras)
+**Versão:** 1.1.0 (Cyberpunk Persistence)
+**Status:** Produção Estável (Dockerizado)
+**Data de Atualização:** 01/12/2025
+**Arquitetura:** Microserviço Híbrido com IA & Persistência em Volume
 
 ---
 
-## 2. Estrutura do Projeto (File System)
+## 1. Visão Geral Executiva
+
+O **FamilyOS** é um sistema de gestão doméstica autônomo. O módulo atual (Lista de Compras) resolve o problema da fragmentação de informações através de uma abordagem **Voice-to-Database**.
+
+Diferente de listas de tarefas comuns, o FamilyOS utiliza Inteligência Artificial para estruturar, categorizar e normalizar os dados, e uma interface **"Dark Neon"** otimizada para uso rápido em supermercados.
+
+### Principais Diferenciais (v1.1)
+1.  **Fricção Zero:** Entrada de dados via áudio no Telegram (sem abrir apps).
+2.  **Resiliência:** Arquitetura Docker com volumes persistentes (à prova de reinicialização).
+3.  **Integridade:** Sanitização estrita de dados para impedir duplicatas.
+4.  **UX Imersiva:** Design Glassmorphism com feedback tátil e edição "Long Press".
+
+---
+
+## 2. Arquitetura Técnica Detalhada
+
+O sistema opera em um fluxo unidirecional de dados para entrada, e bidirecional para gestão.
+
+### 2.1. O Pipeline de Dados
+1.  **Input (Telegram):** Usuário envia áudio/texto.
+2.  **Orquestração (n8n):**
+    * Recebe o Webhook.
+    * Transcreve áudio via **OpenAI Whisper**.
+    * Envia JSON para o endpoint local via túnel.
+3.  **Conectividade (Ngrok):** Túnel seguro expondo o container Docker local para a nuvem.
+4.  **Cérebro (Flask + LangChain):**
+    * Recebe o texto bruto.
+    * Processa via **Google Gemini 2.5 Flash-Lite**.
+    * **Sanitização:** Normaliza texto (Upper/Lower/Strip).
+    * **Persistência:** Grava no SQLite via SQLAlchemy.
+5.  **Interface (Frontend):** Web App reativa consumindo a API local.
+
+### 2.2. Diagrama de Infraestrutura (Docker)
+
+```mermaid
+graph TD
+    subgraph "Host (Windows/Server)"
+        Dados[./data/todo_market.db]
+    end
+
+    subgraph "Container Docker (familyos)"
+        App[Flask App]
+        Vol((Volume Mount))
+    end
+
+    App <--> Vol
+    Vol <--> Dados
+````
+
+O banco de dados **não reside** mais dentro do container efêmero. Ele é mapeado para a pasta `./data` do sistema hospedeiro, garantindo persistência total.
+
+-----
+
+## 3\. Estrutura do Projeto (File System)
+
+Estrutura atualizada para suportar Docker e Volumes:
 
 ```text
 projects/todo_market_list/
-├── docs/                   # Documentação e Atas de Reunião
+├── docs/                   # Memória do Projeto (Atas, Relatórios)
+├── data/                   # [NOVO] Persistência do SQLite (Mapeado via Docker)
+│   └── todo_market.db      # O Banco de Dados vivo
 ├── src/
-│   ├── static/
-│   │   └── css/
-│   │       └── styles.css  # Estilização Mobile-First (No-Zoom Checkbox)
+│   ├── static/css/
+│   │   └── styles.css      # Design System Dark Neon
 │   ├── templates/
-│   │   └── index.html      # Frontend Jinja2 com Fetch API
-│   ├── app.py              # Cérebro: API Flask + Modelos + Lógica NLP
-│   ├── reset_db.py         # Utilitário para recriar o banco
-│   ├── requirements.txt    # Dependências do Python
-│   └── todo_market.db      # Banco de Dados SQLite (Arquivo Vivo)
-└── .gitignore              # Proteção de dados sensíveis
-````
-
------
-
-## 3\. Especificações Técnicas dos Componentes
-
-### 3.1. Backend (`src/app.py`)
-
-Um monólito leve que centraliza a lógica de negócio.
-
-  * **Framework:** Flask.
-  * **ORM:** Flask-SQLAlchemy.
-  * **AI:** LangChain + Google Generative AI (`gemini-2.5-flash-lite`).
-  * **Endpoints:**
-      * `POST /magic`: Recebe `{'texto': '...', 'usuario': '...'}`. Processa NLP, verifica duplicidade e salva.
-      * `GET /`: Renderiza a lista de compras agrupada por categorias (Acordeão).
-      * `POST /toggle_item/<id>`: Inverte status (`pendente` ↔ `comprado`).
-      * `POST /clear_cart`: Arquiva itens comprados (`comprado` → `finalizado`).
-
-### 3.2. Banco de Dados (Schema)
-
-Modelagem relacional normalizada para integridade de dados.
-
-  * **Produtos:** Catálogo mestre (Nome, FK Categoria, FK Unidade Padrão).
-  * **ListaItem:** A "compra" atual. Contém `quantidade`, `usuario` (quem pediu) e `status`.
-  * **Categorias/Unidades:** Tabelas de domínio para padronização.
-
-### 3.3. Frontend (`index.html` + `styles.css`)
-
-Interface desenhada para uso com uma mão (no supermercado).
-
-  * **UX "No-Zoom":** Checkboxes customizados de 32px para toque fácil.
-  * **Organização:** Itens agrupados por Categoria em painéis expansíveis (Acordeão).
-  * **Interatividade:** JavaScript (`fetch`) atualiza o banco sem recarregar a página.
-  * **Feedback:** Itens comprados ficam riscados e opacos visualmente.
-
------
-
-## 4\. Regras de Negócio Implementadas
-
-1.  **Anti-Duplicidade Inteligente:**
-
-      * Se o usuário pede "Leite" e já existe "Leite" pendente na lista, o sistema **ignora** a adição e avisa no log. Não há itens repetidos.
-
-2.  **Normalização via IA:**
-
-      * O Prompt do Gemini força: "Converta tudo para **singular** e **minúsculas**".
-      * *Exemplo:* "Comprar 3 Batatas" vira `{"nome": "batata", "qtd": 3}`.
-
-3.  **Fluxo de 3 Estados:**
-
-      * `pendente`: Item na lista para comprar.
-      * `comprado`: Item no carrinho (riscado na tela).
-      * `finalizado`: Item processado (removido da tela pelo botão "Limpar").
-
-4.  **Identidade:**
-
-      * O sistema registra quem fez o pedido ("Thiago" ou "Esposa") e exibe essa tag no card do produto.
-
------
-
-## 5\. Guia de Operação (Como Rodar)
-
-### Passo 1: Iniciar o Backend
-
-No terminal, dentro da pasta `src`:
-
-```powershell
-python app.py
+│   │   ├── index.html      # SPA com Modal de Edição e Long Press
+│   │   └── login.html      # Autenticação Simples
+│   ├── app.py              # Core: Rotas, Models, Sanitização, IA
+│   ├── reset_db.py         # Script de Seed e Reset (Cria usuários admin)
+│   └── requirements.txt    # Dependências (Flask, SQLAlchemy, LangChain)
+├── docker-compose.yml      # [NOVO] Orquestração do Container e Volumes
+├── Dockerfile              # Imagem Python 3.11 Slim
+└── .env                    # Segredos (API Keys)
 ```
 
-*(O servidor rodará em `http://127.0.0.1:5000`)*
+-----
 
-### Passo 2: Abrir o Túnel
+## 4\. Especificações Funcionais (Backend & Frontend)
 
-Em outro terminal (na pasta `src`):
+### 4.1. API Flask (`app.py`)
+
+O backend atua como controlador central e guardião da integridade.
+
+  * **Sanitização Estrita (Anti-Duplicidade):**
+
+      * Antes de salvar qualquer dado, o sistema aplica:
+          * *Categorias:* `UPPERCASE` + `strip()` (Ex: " Padaria " -\> "PADARIA").
+          * *Itens:* `lowercase` + `strip()` (Ex: "Leite " -\> "leite").
+      * Isso impede que "Leite" e "leite" coexistam.
+
+  * **Endpoints Críticos:**
+
+      * `POST /magic`: Entrada via IA (Telegram).
+      * `POST /update_item`: **[NOVO]** Edição de item (Nome/Categoria).
+      * `POST /toggle_item/<id>`: Check/Uncheck.
+      * `GET /`: Renderização da lista.
+
+### 4.2. Interface "Dark Neon" (`index.html`)
+
+Um Design System proprietário focado em usabilidade noturna e contraste.
+
+  * **Paleta de Cores:**
+      * Fundo: *Deep Void* (`#050509`)
+      * Acentos: *Neon Purple* (`#611af0`), *Green* (`#22ff7a`), *Red* (`#ff3131`).
+  * **Interatividade Avançada (Sprint 7):**
+      * **Long Press (600ms):** Tocar e segurar um item abre o modo de edição.
+      * **Modal Glassmorphism:** Janela de edição com fundo desfocado e inputs escuros.
+      * **DataList Inteligente:** Ao editar a categoria, o sistema sugere categorias existentes para evitar fragmentação.
+
+-----
+
+## 5\. Manual de Operação (Docker)
+
+A execução agora é containerizada, eliminando problemas de dependência ("funciona na minha máquina").
+
+### 5.1. Iniciar o Sistema
+
+Na raiz do projeto (onde está o `docker-compose.yml`):
 
 ```powershell
-.\ngrok.exe http 5000
+# Iniciar em segundo plano (com rebuild para garantir código novo)
+docker compose up -d --build
 ```
 
-*(Copie a URL HTTPS gerada e atualize o nó HTTP Request no n8n)*
+### 5.2. Resetar/Semear Banco de Dados
 
-### Passo 3: Usar
+Se precisar limpar tudo e recriar os usuários padrão (`thiago` / `debora`):
 
-  * **Adicionar:** Mande áudio no Telegram.
-  * **Visualizar:** Abra `http://127.0.0.1:5000` no navegador (PC ou Celular na mesma rede).
-  * **Comprar:** Clique nas bolinhas para marcar.
-  * **Finalizar:** Clique em "Limpar" no final da compra.
+```powershell
+# Executa o script python DENTRO do container rodando
+docker compose exec web python src/reset_db.py
+```
+
+### 5.3. Monitoramento
+
+Para ver os logs da aplicação e da IA em tempo real:
+
+```powershell
+docker compose logs -f
+```
 
 -----
 
-## 6\. Próximos Passos (Roadmap Futuro)
+## 6\. Roadmap e Próximos Passos
 
-  * **Sprint 5 (Deploy):** Migrar para VPS/Render para eliminar a dependência do PC ligado e do Ngrok.
-  * **Módulo de Receitas:** Implementar comando "Salvar receita de bolo" para adicionar múltiplos ingredientes de uma vez.
-  * **Analytics:** Dashboard para ver "Quanto gastamos com carne este mês?".
+O sistema atingiu a maturidade de **MVP Resiliente**. Os próximos passos visam expansão de features.
+
+1.  **Deploy em Nuvem (Sprint 8):**
+
+      * Migrar de `localhost` + Ngrok para uma VPS (ex: DigitalOcean ou HostGator) com SSL real.
+      * Objetivo: Disponibilidade 24/7 sem depender do PC ligado.
+
+2.  **Módulo de Receitas (Sprint 9):**
+
+      * Comando: "Quero fazer um bolo de cenoura".
+      * Ação: O sistema busca os ingredientes e adiciona à lista apenas o que não temos (estoque virtual).
+
+3.  **Dashboards de Analytics (Sprint 10):**
+
+      * Visualização de gastos por categoria (Gráficos Chart.js).
 
 -----
 
-**Desenvolvido por:** Thiago Scutari & Gemini e Equipe de Agentes (Alpha, Architect, Builder, Star).
-**Tecnologia:** Python, AI, Automation.
+**Equipe de Desenvolvimento (Agentes):**
+
+  * 🤖 **Alpha:** Gerente de Produto
+  * 🤖 **Architect:** Infraestrutura & Dados
+  * 🤖 **Experience:** Frontend & UX
+  * 🤖 **Builder:** Implementação de Código
+
+**Aprovado em:** 01/12/2025
 
 ```
