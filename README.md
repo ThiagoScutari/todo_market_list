@@ -5,45 +5,35 @@ O **FamilyOS** é um sistema híbrido de gestão doméstica inteligente, focado 
 
 ---
 
-## 💡 O Que Ele Faz? (Showcase)
+## 💡 Showcase: O Fluxo de Uso
 
-### 1. Você fala no Telegram (Voz ou Texto)
-O sistema aceita listas complexas e áudios com ingredientes misturados.
+### 1. Entrada de Dados (Telegram)
+A interface de entrada é o Telegram. O sistema aceita áudios com linguagem natural ("preciso de 3 ovos e uma caixa de leite") ou texto direto. O bot confirma o recebimento e valida os itens.
 ![Interação Telegram](images/telegram.png)
 
-### 2. A Mágica Acontece (Backend + IA)
-O n8n orquestra a transcrição e envia para nossa API Python, que usa Gemini para estruturar os dados.
+### 2. Orquestração (n8n & Backend)
+O **n8n** atua como o sistema nervoso, recebendo o webhook do Telegram, processando o áudio via Whisper e enviando para a API Python estruturar os dados com Gemini.
 ![Fluxo n8n](images/n8n.png)
 
-### 3. A Lista Aparece Pronta (Web App)
-Uma interface mobile-first para usar no mercado, com agrupamento inteligente por categorias.
-![Interface Web](images/layout.png)
+### 3. Segurança e Acesso (Login)
+O sistema conta com uma camada de autenticação para garantir que apenas a família tenha acesso à gestão da lista.
+![Tela de Login](images/login.png)
+
+### 4. A Lista Inteligente (Web App)
+Uma interface *mobile-first* limpa. O sistema agrupa automaticamente os itens por categorias (Padaria, Laticínios, etc.) para otimizar o trajeto dentro do supermercado.
+![Interface Principal](images/layout_principal.png)
+
+### 5. Feedback Visual e Interatividade
+Ao marcar um item, ele recebe um feedback visual imediato (check verde e risco), facilitando a visualização do que falta comprar. O estado é salvo em tempo real no banco de dados.
+![Efeitos Visuais](images/efeitos.png)
 
 ---
 
 ## 🏗️ Arquitetura Técnica (Sprint 5 - Produção)
 
-A arquitetura evoluiu para um **Monólito Modular Inteligente**, hospedado em VPS com Docker e Traefik.
+A arquitetura evoluiu para um **Monólito Modular Inteligente**, hospedado em VPS com Docker e Traefik, garantindo segurança (HTTPS) e facilidade de deploy.
 
-```
-
-┌─────────────────┐    ┌──────────────────┐    ┌───────────────────────────┐
-│   INTERFACE     │    │   ORQUESTRADOR   │    │    CÉREBRO & FRONTEND     │
-│                 │    │                  │    │                           │
-│  • Telegram     │───▶│  • n8n           │───▶│  • Flask (API + Web)      │
-│  • (Voz/Texto)  │    │  • Whisper       │    │  • Gemini AI (NLP)        │
-└─────────────────┘    └──────────────────┘    │  • SQLAlchemy (DB)        │
-└─────────────┬─────────────┘
-│
-▼
-┌──────────────────┐
-│    MEMÓRIA       │
-│                  │
-│  • SQLite        │
-│  (Volume Docker) │
-└──────────────────┘
-
-````
+![Arquitetura do Sistema](images/arquitetura.png)
 
 ### Componentes Chave
 
@@ -53,7 +43,7 @@ A arquitetura evoluiu para um **Monólito Modular Inteligente**, hospedado em VP
 | **Orquestrador** | Transcrição e Roteamento | n8n, OpenAI Whisper |
 | **Cérebro (NLP)** | Extração de itens e Categorização | Google Gemini 2.5 Flash-Lite, LangChain |
 | **Backend** | Regras de Negócio e Persistência | Python Flask, Gunicorn, SQLAlchemy |
-| **Frontend** | Visualização e Controle (Check-off) | HTML5, CSS3 (Mobile-First), Jinja2, JS Fetch |
+| **Frontend** | Visualização e Controle | HTML5, CSS3 (Mobile-First), Jinja2, JS Fetch |
 | **Infraestrutura** | Deploy e Segurança | Docker Compose, Traefik (Reverse Proxy + SSL) |
 
 ---
@@ -61,19 +51,19 @@ A arquitetura evoluiu para um **Monólito Modular Inteligente**, hospedado em VP
 ## 🎯 Funcionalidades do Módulo de Compras
 
 ### 1. Entrada Inteligente (`POST /magic`)
-* **Processamento de Linguagem Natural:** Entende frases complexas ("3kg de costela para churrasco").
-* **Normalização:** Converte plurais para singular e padroniza unidades.
-* **Anti-Duplicidade:** Se o item já está na lista, ele não duplica.
-* **Identidade:** Rastreia quem pediu o item (Thiago ou Esposa).
+* **Processamento de Linguagem Natural (NLP):** O sistema entende contextos complexos. Ex: "2kg de carne moída para o almoço de domingo".
+* **Normalização de Dados:** Converte plurais para singular, padroniza unidades de medida (ml, litros, kg) e corrige erros de digitação.
+* **Anti-Duplicidade:** O algoritmo verifica se o item já existe na lista antes de adicionar. Se existir, ele apenas atualiza a quantidade ou ignora.
+* **Rastreabilidade:** Identifica quem solicitou o item (ex: Thiago ou Esposa), útil para tirar dúvidas na hora da compra.
 
-### 2. Interface de Compras (`GET /`)
-* **Design No-Zoom:** Checkboxes grandes e áreas de toque otimizadas para celular.
-* **Organização:** Agrupamento automático por categorias (Hortifrúti, Padaria, etc.).
-* **Feedback Visual:** Itens comprados ficam riscados instantaneamente.
+### 2. Interface de Compras Otimizada (`GET /`)
+* **Design No-Zoom:** Botões grandes, checkboxes acessíveis e tipografia legível, projetados para serem usados com uma mão enquanto se empurra o carrinho.
+* **Categorização Automática:** O Gemini classifica os itens em categorias reais de mercado (Hortifrúti, Limpeza, Açougue), evitando idas e vindas nos corredores.
+* **Sincronização:** A lista é única para todos os usuários. Se alguém adiciona um item em casa, aparece instantaneamente para quem está no mercado.
 
-### 3. Gestão de Estado (`POST /toggle_item` & `/clear_cart`)
-* **Persistência:** O status (pendente/comprado) é salvo no banco em tempo real.
-* **Limpeza:** Botão para arquivar itens comprados ao final da feira.
+### 3. Gestão de Estado e Persistência
+* **Toggle em Tempo Real:** As rotas `POST /toggle_item` salvam o status (pendente/comprado) instantaneamente no SQLite via SQLAlchemy.
+* **Limpeza de Carrinho:** A função `Clear Cart` permite arquivar todos os itens comprados de uma vez ao finalizar a feira, mantendo a lista limpa para a próxima semana.
 
 ---
 
@@ -88,16 +78,19 @@ Para rodar o projeto localmente:
     ```
 
 2.  **Configurar Ambiente:**
-    * Crie o ambiente virtual e instale as dependências:
-        ```bash
-        pip install -r requirements.txt
-        ```
+    Crie o ambiente virtual e instale as dependências:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    .\venv\Scripts\activate   # Windows
+    pip install -r requirements.txt
+    ```
 
 3.  **Configurar Chaves (`.env`):**
-    * Crie um arquivo `.env` na raiz com suas chaves (GOOGLE_API_KEY).
+    Crie um arquivo `.env` na raiz com suas chaves (especialmente `GOOGLE_API_KEY` para o Gemini).
 
 4.  **Inicializar Banco de Dados:**
-    * Execute o script que cria o SQLite e popula as categorias base:
+    Execute o script que cria o SQLite e popula as categorias base:
     ```powershell
     python src/reset_db.py
     ```
@@ -121,6 +114,6 @@ Para rodar o projeto localmente:
 | **Sprint 5** | Deploy em Produção (Docker + VPS) | ✅ Concluído |
 
 ---
+
 **Desenvolvido por:** Thiago Scutari & Equipe de Agentes (Alpha, Architect, Builder, Star).
-**Tecnologia:** Python, AI, Automation.
-````
+**Tecnologia:** Google Gemini, Python, AI, Automation.
