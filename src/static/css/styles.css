@@ -1,189 +1,304 @@
-/* GLOBAL */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #ffffff;
-    color: #333;
-    margin: 0;
-    padding-bottom: 100px; /* Espaço para o botão flutuante não cobrir o último item */
+/* --- VARIAVEIS (Design System) --- */
+:root {
+    /* Paleta Dark Neon */
+    --bg-body: #050509;        /* Deep Void Azulado */
+    --glass-base: 66, 79, 105; /* Steel Glass (RGB para opacidade) */
+    
+    --neon-purple: #611af0;
+    --neon-green: #22ff7a;     /* Sucesso / Hortifrúti */
+    --neon-blue: #228eff;      /* Frio / Limpeza */
+    --neon-red: #ff3131;       /* Alerta / Carnes */
+    --neon-gold: #ffb800;      /* Padaria */
+    
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    
+    --header-height: 70px;
 }
 
-/* HEADER */
+/* --- GLOBAL --- */
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-body);
+    color: var(--text-primary);
+    margin: 0;
+    padding-bottom: 120px; /* Espaço para o footer flutuante */
+    -webkit-font-smoothing: antialiased;
+}
+
+/* --- MAIN HEADER --- */
 header {
-    background-color: #fff;
+    background: rgba(5, 5, 9, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     padding: 1.2rem;
-    text-align: center;
-    border-bottom: 2px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between; /* Espalha título e user-controls */
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
 }
 
 header h1 {
-    font-size: 1.4rem;
-    font-weight: 700;
+    font-size: 1.2rem;
+    font-weight: 800;
     margin: 0;
-    color: #4a4a4a;
+    background: linear-gradient(90deg, #fff, var(--text-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     display: flex;
-    justify-content: center;
     align-items: center;
     gap: 10px;
 }
 
-/* CONTAINER */
+header i {
+    color: var(--neon-purple); /* Icone do carrinho brilha roxo */
+    font-size: 1.4rem;
+}
+
+/* User Controls (Logout) */
+.user-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.welcome-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: none; /* Esconde em mobile muito pequeno */
+}
+
+@media (min-width: 400px) {
+    .welcome-text { display: block; }
+}
+
+.btn-logout {
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    transition: color 0.2s;
+}
+.btn-logout:hover {
+    color: var(--neon-red);
+}
+
 .container {
-    padding: 0.5rem;
+    padding: 1rem;
     max-width: 600px;
     margin: 0 auto;
 }
 
-/* CATEGORIAS (Fundo Cinza e Arredondado) */
+/* --- CATEGORIAS (STICKY & NEON) --- */
 .category-section {
-    margin-bottom: 0.8rem;
-    background-color: #fff;
-    border: 1px solid #dee2e6; /* Borda sutil para definição */
-    border-radius: 12px;       /* Cantos arredondados */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* A sombra "pop-up" que você pediu */
-    overflow: hidden;          /* Garante que o conteúdo não vaze das bordas arredondadas */
+    margin-bottom: 24px;
+    position: relative;
 }
+
 .category-header {
-    background-color: #f1f3f5; /* Cinza claro da imagem */
-    padding: 14px 18px;
-    border-radius: 12px; /* Cantos arredondados */
+    /* Glassmorphism */
+    background: rgba(var(--glass-base), 0.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-weight: 600;
-    color: #495057;
+    
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+    
     cursor: pointer;
-    margin-bottom: 10px;
-    user-select: none;
+    z-index: 100;
+    
+    /* STICKY MAGIC */
+    position: sticky;
+    top: var(--header-height); /* Cola logo abaixo do Header principal */
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
 }
+
+/* Cores Dinâmicas por Atributo (Veremos no HTML) */
+.category-header[data-color="green"] { border-left: 4px solid var(--neon-green); box-shadow: 0 0 15px rgba(34, 255, 122, 0.1); }
+.category-header[data-color="red"] { border-left: 4px solid var(--neon-red); box-shadow: 0 0 15px rgba(255, 49, 49, 0.1); }
+.category-header[data-color="blue"] { border-left: 4px solid var(--neon-blue); box-shadow: 0 0 15px rgba(34, 142, 255, 0.1); }
+.category-header[data-color="gold"] { border-left: 4px solid var(--neon-gold); box-shadow: 0 0 15px rgba(255, 184, 0, 0.1); }
+.category-header[data-color="purple"] { border-left: 4px solid var(--neon-purple); }
 
 .toggle-icon {
     transition: transform 0.3s ease;
-    font-size: 0.9rem;
+    opacity: 0.7;
 }
 
-/* LISTA DE PRODUTOS */
+/* --- CARDS DE PRODUTOS --- */
 .product-list {
-    display: block; /* Padrão aberto */
-    padding: 0 4px; /* Leve recuo */
+    display: block;
+    margin-top: 8px;
+    padding: 0 4px;
 }
 
-/* CARD DO PRODUTO (Linha divisória e Sombra) */
 .product-card {
-    background: #fff;
-    padding: 16px 8px; /* Espaçamento interno */
-    border-bottom: 1px solid #e9ecef; /* Linha divisória */
+    /* Card Flutuante */
+    background: rgba(var(--glass-base), 0.15); /* Mais transparente que o header */
+    margin-bottom: 8px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: all 0.2s ease;
 }
 
-.product-card:last-child {
-    border-bottom: none;
+.product-card:active {
+    transform: scale(0.98);
 }
 
-/* Estado Riscado */
-.product-card.checked .product-name,
-.product-card.checked .product-meta {
-    opacity: 0.4;
-    text-decoration: line-through;
-}
-
-/* Tipografia do Item */
+/* --- TIPOGRAFIA DO ITEM --- */
 .product-name {
     font-size: 1.1rem;
-    font-weight: 700; /* Negrito como na imagem */
-    color: #212529;
+    font-weight: 500;
+    color: var(--text-primary);
     margin-bottom: 4px;
 }
 
+.emoji-icon {
+    font-size: 1.2em;
+    margin-right: 6px;
+    filter: drop-shadow(0 0 2px rgba(255,255,255,0.3)); /* Brilho no emoji */
+}
+
 .product-meta {
-    font-size: 0.9rem;
-    color: #868e96;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.separator {
-    font-size: 1.2rem;
-    line-height: 0;
-    margin-top: -2px;
+.user-badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--neon-purple);
 }
 
-/* CHECKBOX (Círculo Grande) */
+/* --- ESTADO COMPRADO (RISCADO) --- */
+.product-card.checked {
+    background: rgba(var(--glass-base), 0.05);
+    border-color: rgba(34, 255, 122, 0.1); /* Borda verde super suave */
+}
+
+.product-card.checked .product-name {
+    color: var(--text-secondary);
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+.product-card.checked .emoji-icon {
+    filter: grayscale(1);
+    opacity: 0.5;
+}
+
+/* --- CHECKBOX CUSTOMIZADO (NEON) --- */
 .product-checkbox {
     position: relative;
-    width: 32px;
-    height: 32px;
-    margin-right: 8px; /* Afastar um pouco da borda */
+    width: 28px;
+    height: 28px;
 }
 
 .product-checkbox input { display: none; }
 
 .product-checkbox label {
     display: block;
-    width: 32px;
-    height: 32px;
-    border: 2px solid #ced4da;
-    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%; /* Redondo */
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     position: relative;
+    background: transparent;
 }
 
+/* Check Marcado */
 .product-checkbox input:checked + label {
-    background-color: #28a745;
-    border-color: #28a745;
+    background-color: var(--neon-green);
+    border-color: var(--neon-green);
+    box-shadow: 0 0 12px var(--neon-green); /* NEON GLOW */
 }
 
-/* Check branco */
 .product-checkbox input:checked + label::after {
     content: '';
     position: absolute;
-    left: 10px;
-    top: 6px;
-    width: 8px;
-    height: 14px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
+    left: 8px;
+    top: 4px;
+    width: 6px;
+    height: 12px;
+    border: solid #000; /* Check preto para contraste no neon */
+    border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
 
-/* BOTÃO VERMELHO NO RODAPÉ */
+/* --- FOOTER & BOTÃO --- */
 footer {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: linear-gradient(to top, #ffffff 90%, rgba(255,255,255,0));
-    padding: 20px;
-    text-align: center;
-    box-sizing: border-box;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 500px;
+    z-index: 1000;
 }
 
 .btn-clear-large {
     width: 100%;
-    max-width: 560px;
-    background-color: #ff3b30; /* Vermelho vibrante */
-    color: white;
-    font-size: 1.1rem;
+    background: rgba(255, 49, 49, 0.15); /* Fundo vermelho translúcido */
+    backdrop-filter: blur(8px);
+    color: var(--neon-red);
+    font-size: 1rem;
     font-weight: 700;
-    padding: 14px;
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 16px;
+    
+    border: 1px solid var(--neon-red);
+    border-radius: 50px; /* Pílula */
+    
+    box-shadow: 0 10px 20px rgba(0,0,0,0.5);
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: all 0.3s;
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
 }
 
-.btn-clear-large:active {
-    transform: scale(0.98);
+.btn-clear-large:hover {
+    background: var(--neon-red);
+    color: #fff;
+    box-shadow: 0 0 20px var(--neon-red);
 }
 
 .empty-state {
     text-align: center;
-    margin-top: 50px;
+    margin-top: 80px;
+    color: var(--text-secondary);
+}
+.empty-state i {
+    font-size: 4rem;
+    color: rgba(255,255,255,0.1);
 }

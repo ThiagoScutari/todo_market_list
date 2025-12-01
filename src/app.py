@@ -4,8 +4,10 @@ import json
 import datetime
 import logging
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from sqlalchemy.orm import joinedload
@@ -17,12 +19,30 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "uma_chave_super_secreta_e_segura") # Necessário para sessões
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'todo_market.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login' # Redireciona para cá se não estiver logado
 
 # --- MODELOS ---
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
 class Categoria(db.Model):
     __tablename__ = 'categorias'
     id = db.Column(db.Integer, primary_key=True)
@@ -38,6 +58,7 @@ class Produto(db.Model):
     __tablename__ = 'produtos'
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), unique=True, nullable=False)
+    emoji = db.Column(db.String(10), nullable=True) # Novo campo Emoji
     categoria_id = db.Column(db.Integer, db.ForeignKey('categorias.id'))
     unidade_padrao_id = db.Column(db.Integer, db.ForeignKey('unidades_medida.id'))
     
@@ -65,21 +86,57 @@ class ListaItem(db.Model):
     unidade = db.relationship('UnidadeMedida')
     tipo_lista = db.relationship('TipoLista')
 
+# --- CONFIGURAÇÃO DE LOGIN ---
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 # --- IA ---
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.0)
 
 prompt_template = """
 Extraia os itens de compra. Retorne LISTA JSON.
 Converta nomes para singular e minúsculas.
-Exemplo: [{{"nome": "leite", "quantidade": 2, "unidade": "L", "categoria": "Padaria"}}]
-Campos: nome, quantidade (float), unidade (símbolo: kg, g, L, ml, un), categoria (Hortifrúti, Padaria, Carnes, Limpeza).
+Retorne um campo 'emoji' visualmente correspondente ao item.
+Categorias Sugeridas: Hortifrúti, Padaria, Carnes, Limpeza, Bebidas, Churrasco, Laticínios, Outros.
+
+Exemplo: [{{"nome": "leite", "quantidade": 2, "unidade": "L", "categoria": "Laticínios", "emoji": "🥛"}}]
+Campos: nome, quantidade (float), unidade (símbolo: kg, g, L, ml, un), categoria, emoji.
 Texto: {texto}
 """
 prompt = ChatPromptTemplate.from_template(prompt_template)
 chain = prompt | model
 
-# --- ROTAS ---
+# --- ROTAS DE AUTH ---
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('home'))
+        else:
+            flash('Usuário ou senha inválidos')
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+# --- ROTAS DA APLICAÇÃO (PROTEGIDAS) ---
+
 @app.route('/', methods=['GET'])
+@login_required
 def home():
     try:
         itens = ListaItem.query.options(
@@ -96,9 +153,11 @@ def home():
             qtd = int(item.quantidade) if item.quantidade and item.quantidade % 1 == 0 else item.quantidade
             und = item.unidade.simbolo if item.unidade else ""
             
+            # Passa o Emoji do produto para a view
             categorias_view[cat_nome].append({
                 'id': item.id,
                 'nome': item.produto.nome.title(),
+                'emoji': item.produto.emoji or "🛒", # Fallback se não tiver emoji
                 'detalhes': f"{qtd}{und}" if und else str(qtd),
                 'usuario': item.usuario,
                 'status': item.status
@@ -109,6 +168,7 @@ def home():
         return f"Erro: {str(e)}"
 
 @app.route('/toggle_item/<int:item_id>', methods=['POST'])
+@login_required
 def toggle_item(item_id):
     try:
         item = ListaItem.query.get(item_id)
@@ -120,6 +180,7 @@ def toggle_item(item_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/clear_cart', methods=['POST'])
+@login_required
 def clear_cart():
     try:
         itens = ListaItem.query.filter_by(status='comprado').all()
@@ -130,6 +191,10 @@ def clear_cart():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/magic', methods=['POST'])
+# @login_required -> O n8n chama essa rota. Se o n8n não suportar cookies, 
+# podemos proteger via API Key ou deixar aberto apenas para localhost no firewall.
+# Por simplicidade da Sprint, vamos deixar aberto para o n8n acessar, 
+# mas em produção real usaríamos um token no header.
 def magic_endpoint():
     data = request.get_json()
     if not data or 'texto' not in data: return jsonify({"erro": "JSON inválido"}), 400
@@ -138,7 +203,6 @@ def magic_endpoint():
     usuario = data.get('usuario', 'Anônimo')
     
     try:
-        # NLP
         res = chain.invoke({"texto": texto})
         clean_content = re.sub(r'```json|```', '', res.content).strip()
         
@@ -151,24 +215,37 @@ def magic_endpoint():
         if isinstance(dados, dict): dados = [dados]
 
         itens_salvos = []
-        itens_ignorados = [] # Nova lista para feedback
+        itens_ignorados = []
 
         for item in dados:
             cat = Categoria.query.filter(Categoria.nome.ilike(f"%{item.get('categoria')}%")).first()
+            if not cat and item.get('categoria'):
+                # Cria categoria se não existir (Opcional, mas útil para novas sugeridas pela IA)
+                cat = Categoria(nome=item.get('categoria'))
+                db.session.add(cat)
+                db.session.flush()
+
             und = UnidadeMedida.query.filter(UnidadeMedida.simbolo.ilike(f"{item.get('unidade')}")).first()
             
             prod = Produto.query.filter(Produto.nome.ilike(item.get('nome'))).first()
             if not prod:
-                prod = Produto(nome=item.get('nome'), categoria_id=cat.id if cat else None, unidade_padrao_id=und.id if und else None)
+                prod = Produto(
+                    nome=item.get('nome'), 
+                    emoji=item.get('emoji'), # Salva o Emoji
+                    categoria_id=cat.id if cat else None, 
+                    unidade_padrao_id=und.id if und else None
+                )
                 db.session.add(prod)
                 db.session.flush()
+            else:
+                # Atualiza emoji se o produto já existia mas não tinha emoji
+                if not prod.emoji and item.get('emoji'):
+                    prod.emoji = item.get('emoji')
 
             # Anti-Duplicidade
             existe = ListaItem.query.filter(ListaItem.produto_id == prod.id, or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')).first()
-            
             if existe:
-                logging.info(f"Ignorando duplicado: {prod.nome}")
-                itens_ignorados.append(prod.nome) # Adiciona à lista de ignorados
+                itens_ignorados.append(prod.nome)
                 continue
 
             novo_item = ListaItem(
@@ -183,16 +260,11 @@ def magic_endpoint():
 
         db.session.commit()
         
-        # --- Construção da Mensagem Inteligente ---
-        partes_msg = []
-        if itens_salvos:
-            partes_msg.append(f"Adicionados: {', '.join(itens_salvos)}")
-        if itens_ignorados:
-            partes_msg.append(f"Já na lista: {', '.join(itens_ignorados)}")
-            
-        mensagem_final = " | ".join(partes_msg) if partes_msg else "Nenhum item novo identificado."
-
-        return jsonify({"message": mensagem_final}), 201
+        msg_parts = []
+        if itens_salvos: msg_parts.append(f"✅ Adicionados: {', '.join(itens_salvos)}")
+        if itens_ignorados: msg_parts.append(f"⚠️ Já na lista: {', '.join(itens_ignorados)}")
+        
+        return jsonify({"message": " | ".join(msg_parts) if msg_parts else "Nenhum item novo."}), 201
 
     except Exception as e:
         db.session.rollback()
