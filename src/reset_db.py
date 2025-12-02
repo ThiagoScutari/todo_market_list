@@ -9,8 +9,8 @@ def reset():
 
         # 2. Cria Usuários
         print("👤 Criando usuários...")
-        db.session.add(User(username='thiago', password_hash='2904'))
-        db.session.add(User(username='debora', password_hash='1712'))
+        db.session.add(User(username='thiago', password_hash='***xyz'))
+        db.session.add(User(username='debora', password_hash='xpto***'))
 
         # 3. Cria Categorias Padrão
         print("📂 Criando categorias...")
