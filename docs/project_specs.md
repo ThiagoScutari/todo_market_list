@@ -1,357 +1,215 @@
 # Documento Mestre de Arquitetura: FamilyOS
 
-## 1. Introdução
-
-### 1.1. Propósito do Documento
-Este documento estabelece a arquitetura completa do sistema FamilyOS, substituindo a especificação inicial que se encontra defasada frente às implementações realizadas. Serve como fonte única da verdade para o desenvolvimento, manutenção e evolução do projeto.
-
-### 1.2. Escopo do Projeto
-O FamilyOS é um sistema híbrido de gestão doméstica inteligente, com foco inicial no módulo de compras. O sistema combina tecnologias de nuvem e processamento local para oferecer experiência de **Fricção Zero** na entrada e gestão de informações.
-
-### 1.3. Partes Interessadas
-- **Usuários finais:** Membros da família (Thiago, Esposa)
-- **Equipe de desenvolvimento:** Alpha, Architect, Experience, Builder
-- **Administradores do sistema:** Responsáveis pela infraestrutura
-
-## 2. Visão Geral do Sistema
-
-### 2.1. Objetivos Estratégicos
-- Reduzir a fricção na entrada de dados domésticos
-- Centralizar informações familiares de forma inteligente
-- Automatizar processos domésticos recorrentes
-- Prover insights baseados em dados históricos
-
-### 2.2. Princípios Arquiteturais
-1. **Fricção Zero:** Interface natural (voz) como padrão
-2. **Resiliência Nativa:** Tolerância a falhas por design
-3. **Desacoplamento:** Separação clara de responsabilidades
-4. **Escalabilidade:** Capacidade de crescimento modular
-5. **Privacidade:** Controle sobre dados sensíveis
-
-## 3. Arquitetura Técnica Detalhada
-
-### 3.1. Visão de Alto Nível
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│   INTERFACE     │    │   ORQUESTRADOR   │    │    CÉREBRO       │
-│                 │    │                  │    │                  │
-│  • Telegram     │───▶│  • n8n           │───▶│  • Flask API     │
-│  • (Voz/Texto)  │    │  • Whisper       │    │  • Gemini AI     │
-│                 │    │  • Ngrok         │    │  • LangChain     │
-└─────────────────┘    └──────────────────┘    └──────────────────┘
-                                                           │
-                                                           ▼
-┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│   VISUALIZAÇÃO  │    │    MEMÓRIA       │    │  INTELIGÊNCIA    │
-│                 │    │                  │    │                  │
-│  • WEB          │◀──│  • SQLite        │◀──│  • Processamento  │
-│  • (Futuro Web) │    │  • SQLAlchemy    │    │  • Analytics     │
-│                 │    │  • Models        │    │                  │
-└─────────────────┘    └──────────────────┘    └──────────────────┘
-```
-
-### 3.2. Componentes do Sistema
-
-### 3.2.1. Camada de Interface (Frontend)
-**Telegram Bot (Input)**
-- Função: Interface primária de entrada rápida (Voz/Texto).
-
-**Web App Responsivo (Visualização & Controle)**
-- Função: Dashboard para visualização da lista no mercado e gestão financeira.
-- Stack: Flask Templates (Jinja2) + HTML5 + CSS (Bootstrap/Tailwind).
-- Características:
-  - Mobile-First (Focado no uso via celular no mercado).
-  - Checkboxes interativos para marcar itens comprados.
-  - Atualização em tempo real (AJAX/Fetch).
-  - Acesso via navegador (sem instalação de app).
-
-#### 3.2.2. Camada de Orquestração (Middleware)
-**n8n Workflow**
-```yaml
-Workflow Principal:
-  - Trigger: Telegram Message
-  - Processamento:
-      - Tipo: Audio/Text Detection
-      - Transcrição: Gemini (para áudio)
-      - Enriquecimento: Extração de metadados do usuário
-  - Saída: HTTP Request para API Flask
-```
-
-**Ngrok Tunnel**
-- **Propósito:** Exposição segura do ambiente local
-- **Configuração:** Túnel HTTPS para `localhost:5000`
-- **Segurança:** Criptografia ponta a ponta
-
-#### 3.2.3. Camada de Processamento (Backend)
-**API Flask (`app.py`)**
-```python
-# Estrutura Principal
-Endpoints:
-  - POST /magic: Processamento NLP e persistência
-  - (Futuro) GET /items: Consulta de itens
-  - (Futuro) PUT /items/:id: Atualização de status
-
-Características:
-  - Arquitetura de Microserviço
-  - Tratamento robusto de erros
-  - Logging detalhado
-```
-
-**Motor de Inteligência Artificial**
-```python
-# Configuração LangChain
-model = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", 
-    temperature=0.0
-)
-
-# Pipeline NLP
-prompt_template = """
-Extraia os itens de compra. Retorne LISTA JSON.
-Campos: nome, quantidade, unidade, categoria
-"""
-```
-
-#### 3.2.4. Camada de Dados (Persistence)
-**Modelo de Dados SQLAlchemy**
-```python
-# Entidades Principais
-- Categoria: Categorização de produtos
-- UnidadeMedida: Unidades de medida suportadas
-- Produto: Catálogo mestre de produtos
-- ListaItem: Itens ativos nas listas
-- TipoLista: Classificação de listas
-- Receita: Gestão de receitas culinárias
-```
-
-**Esquema do Banco de Dados**
-```sql
--- Tabela Principal: Lista de Itens
-CREATE TABLE lista_itens (
-    id INTEGER PRIMARY KEY,
-    produto_id INTEGER FOREIGN KEY,
-    tipo_lista_id INTEGER DEFAULT 1,
-    quantidade FLOAT NOT NULL,
-    unidade_id INTEGER FOREIGN KEY,
-    usuario VARCHAR(50),           -- Nova coluna
-    status VARCHAR(20) DEFAULT 'pendente',
-    adicionado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
-    origem_input VARCHAR(100)
-);
-```
-
-### 3.3. Fluxos de Processamento
-
-#### 3.3.1. Fluxo Principal: Voice-to-Database
-**Passo 1: Coleta (Telegram)**
-- Usuário envia áudio/texto para o bot
-- Sistema captura metadados (usuário, timestamp)
-
-**Passo 2: Preparação (n8n)**
-```javascript
-// Lógica de processamento inicial
-const inputTexto = {{ $json.text || $json.message.text }};
-const usuario = {{ $json.message.from.first_name }};
-```
-
-**Passo 3: Transcrição (Whisper)**
-- Arquivo de áudio convertido para texto
-- Tratamento de qualidade de áudio
-
-**Passo 4: Processamento Inteligente (Flask + Gemini)**
-- Análise NLP do texto natural
-- Extração estruturada de entidades
-- Classificação automática de categorias
-
-**Passo 5: Persistência (SQLAlchemy)**
-```python
-# Lógica de negócio
-1. Verifica existência do produto
-2. Cria produto se necessário
-3. Adiciona item à lista com usuário
-4. Commit transacional
-```
-
-**Passo 6: Confirmação (Telegram)**
-- Feedback imediato ao usuário
-- Confirmação dos itens processados
-
-## 4. Especificações Técnicas Detalhadas
-
-### 4.1. Stack Tecnológica
-
-#### 4.1.1. Backend
-```yaml
-Linguagem: Python 3.11+
-Framework: Flask 3.0+
-ORM: SQLAlchemy 2.0+
-AI Framework: LangChain 0.2+
-Database: SQLite (Dev) / PostgreSQL (Prod)
-```
-
-#### 4.1.2. Processamento de Linguagem Natural
-```yaml
-Modelo Primário: Google Gemini 2.5 Flash-Lite
-Modelo Secundário: OpenAI GPT-4 (Fallback)
-Transcrição: OpenAI Whisper
-Temperatura: 0.0 (Determinístico)
-```
-
-#### 4.1.3. Infraestrutura
-```yaml
-Desenvolvimento: Ngrok + Localhost
-Produção: VPS/Render + Domain
-Monitoramento: Logs estruturados
-Backup: Scripts automáticos
-```
-
-### 4.2. Modelo de Dados Expandido
-
-#### 4.2.1. Entidades e Relacionamentos
-```python
-# Diagrama de Relacionamentos
-Categoria (1) ─┐
-               ├─ (N) Produto (1) ─┐
-UnidadeMedida (1) ─┘                ├─ (N) ListaItem
-                                    │
-TipoLista (1) ──────────────────────┘
-```
-
-#### 4.2.2. Atributos Críticos
-**Tabela `lista_itens`:**
-- `usuario`: Rastreamento por membro da família
-- `origem_input`: Audit trail (telegram_voice, manual, etc.)
-- `status`: Máquina de estados (pendente → comprado → cancelado)
-- `adicionado_em`: Timestamp para analytics
-
-### 4.3. APIs e Endpoints
-
-#### 4.3.1. API Magic (`POST /magic`)
-**Request:**
-```json
-{
-  "texto": "comprar 2 litros de leite",
-  "usuario": "Thiago"
-}
-```
-
-**Response:**
-```json
-{
-  "message": "Sucesso! Thiago adicionou: leite",
-  "dados": [
-    {
-      "nome": "leite",
-      "quantidade": 2,
-      "unidade": "L",
-      "categoria": "Padaria"
-    }
-  ]
-}
-```
-
-**Fluxo de Erro:**
-```python
-try:
-    # Processamento principal
-except JSONDecodeError:
-    # Correção automática do JSON
-except SQLAlchemyError:
-    # Rollback transacional
-except Exception as e:
-    # Logging e retorno genérico
-```
-
-## 5. Plano de Desenvolvimento e Evolução
-
-### 5.1. Sprint 3: Frontend Web (Shopping List)
-**Objetivo:** Eliminar a dependência do Notion e criar interface própria.
-**Entregáveis:**
-- Rota `/` no Flask servindo o HTML.
-- Interface de Lista de Compras com Checkbox.
-- Botão para limpar itens comprados.
-- Filtro por Categoria (Hortifrúti, Padaria, etc.).
-
-### 5.2. Sprint 4: Deploy de Produção
-**Objetivo:** Ambiente profissional
-**Entregáveis:**
-- Migração para VPS/Render
-- Domain próprio
-- SSL Certificate
-- Backup automation
-
-### 5.3. Sprint 5: Funcionalidades Avançadas
-**Objetivo:** Expansão do sistema
-**Entregáveis:**
-- Módulo de receitas
-- Sistema de alertas
-- Analytics preditivo
-- Integração com mercados
-
-## 6. Considerações de Qualidade
-
-### 6.1. Segurança
-- Autenticação de usuários via Telegram
-- Validação de entrada em todas as camadas
-- Logs de auditoria completos
-- Criptografia em trânsito (HTTPS)
-
-### 6.2. Performance
-- Cache de produtos frequentes
-- Otimização de queries SQL
-- Processamento assíncrono onde aplicável
-- Monitoramento de latência
-
-### 6.3. Manutenibilidade
-- Código modular e testável
-- Documentação atualizada
-- Logs estruturados
-- Procedures de deploy
-
-### 6.4. Escalabilidade
-- Arquitetura stateless
-- Possibilidade de sharding
-- Load balancing futuro
-- Microserviços independentes
-
-## 7. Métricas de Sucesso
-
-### 7.1. Métricas Técnicas
-- Uptime: 99.5%+
-- Latência API: < 2 segundos
-- Precisão NLP: > 95%
-- Disponibilidade: 24/7
-
-### 7.2. Métricas de Negócio
-- Adoção familiar: 2+ usuários ativos
-- Itens processados: 50+ por semana
-- Redução de tempo: 70% vs método tradicional
-- Satisfação: Feedback positivo contínuo
-
-## 8. Riscos e Mitigações
-
-### 8.1. Riscos Técnicos
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| Downtime Ngrok | Médio | Alto | Migração para infraestrutura profissional |
-| Limitação API Gemini | Baixo | Médio | Sistema de fallback para OpenAI |
-| Corrupção de BD | Baixo | Crítico | Backups automáticos e recovery plan |
-
-### 8.2. Riscos Operacionais
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| Resistência usuários | Médio | Alto | Onboarding gradual e suporte |
-| Manutenção complexa | Baixo | Médio | Documentação detalhada e automation |
-
-## 9. Conclusão
-
-O FamilyOS representa uma evolução significativa na gestão doméstica inteligente, combinando tecnologias modernas com foco na experiência do usuário. A arquitetura aqui documentada fornece base sólida para crescimento sustentável, mantendo os princípios de fricção zero e resiliência que guiaram o desenvolvimento desde o início.
-
-Este documento deve ser revisado e atualizado a cada sprint significativa ou mudança arquitetural majoritária, mantendo-se como a fonte única da verdade para o projeto FamilyOS.
+**Versão:** v1.2 (Stable Persistence)
+**Data da Última Atualização:** 02/12/2025
+**Status:** ✅ Produção (Operacional)
 
 ---
-**Document Version:** 2.0  
-**Last Updated:** {{current_date}}  
-**Maintainer:** Architecture Team  
-**Status:** ✅ Approved
+
+## 1. Introdução
+
+### 1.1. Propósito
+Este documento estabelece a arquitetura técnica, regras de negócio e infraestrutura do sistema **FamilyOS**. Ele serve como fonte única da verdade para manutenção e evolução do projeto, substituindo todas as versões anteriores.
+
+### 1.2. Escopo Atual
+O sistema opera como um assistente de gestão doméstica focado em **Compras de Mercado**.
+* **Entrada:** Áudio/Texto via Telegram (Zero UI).
+* **Processamento:** IA Generativa para estruturação de dados.
+* **Saída:** Web App Mobile-First para uso no supermercado (Rich UI).
+
+---
+
+## 2. Visão Geral da Arquitetura
+
+O sistema segue uma arquitetura de microsserviços containerizados orquestrados via Docker Compose.
+
+### 2.1. Diagrama de Fluxo
+\`\`\`
+[USUÁRIO] 🗣️ Áudio/Texto
+    ⬇
+[TELEGRAM]
+    ⬇
+[n8n] (Orquestrador)
+    │ • Recebe Webhook
+    │ • Baixa Áudio
+    │ • Transcreve (Whisper)
+    ⬇
+[API FAMILYOS] (Flask/Python) ◀─── [GOOGLE GEMINI PRO] (Inteligência)
+    │ • Recebe JSON
+    │ • Extrai Entidades (Nome, Qtd, Categoria)
+    │ • Verifica Duplicidade
+    │ • Persiste no SQLite
+    ⬇
+[BANCO DE DADOS] (SQLite / Wal Mode)
+    ⬆
+[WEB APP] (Browser Mobile)
+    │ • Renderiza Lista (Jinja2)
+    │ • Edição/Check (JS/Fetch)
+\`\`\`
+
+---
+
+## 3. Especificações Técnicas Detalhadas
+
+### 3.1. Stack Tecnológica
+* **Infraestrutura:** VPS Linux (HostGator), Docker, Docker Compose.
+* **Proxy/Segurança:** Traefik (SSL Automático, Roteamento reverso).
+* **Backend:** Python 3.11, Flask, Gunicorn, SQLAlchemy.
+* **Banco de Dados:** SQLite (com Write-Ahead Logging - WAL ativado para concorrência).
+* **Frontend:** HTML5, CSS3 (Variables), JavaScript Vanilla (ES6).
+* **IA:** LangChain + Google Gemini Pro.
+
+### 3.2. Estrutura de Dados (Schema)
+
+#### Tabela \`users\`
+| Campo | Tipo | Descrição |
+| :--- | :--- | :--- |
+| \`id\` | Integer | PK |
+| \`username\` | String | Login (thiago, debora) |
+| \`password_hash\` | String | Hash seguro (scrypt) |
+
+#### Tabela \`lista_itens\` (Core)
+| Campo | Tipo | Descrição |
+| :--- | :--- | :--- |
+| \`id\` | Integer | PK |
+| \`produto_id\` | FK | Relacionamento com tabela produtos |
+| \`quantidade\` | Float | Ex: 1.5, 2.0 |
+| \`unidade_id\` | FK | Relacionamento com tabela unidades |
+| \`usuario\` | String | Quem pediu (audit) |
+| \`status\` | String | 'pendente', 'comprado', 'finalizado' |
+| \`adicionado_em\` | DateTime | Timestamp de criação |
+| \`origem_input\` | String | 'voice', 'manual' |
+
+*(Tabelas auxiliares: \`categorias\`, \`unidades_medida\`, \`produtos\`)*
+
+---
+
+## 4. Funcionalidades e Regras de Negócio
+
+### 4.1. O "Magic Endpoint" (IA)
+* **Rota:** \`POST /magic\`
+* **Modelo IA:** \`gemini-pro\` (Estável).
+* **Lógica de Idempotência:**
+    * Se o item já existe na lista com status \`pendente\` ou \`comprado\`, a IA **ignora** e avisa "Já na lista".
+    * Se não existe, cria.
+* **Parsing:** Utiliza localizadores de bloco JSON (\`[\`, \`]\`) para ignorar Markdown ou texto extra da IA.
+
+### 4.2. Interface do Usuário (UX Mobile)
+* **Long Press (800ms):** Abre modal de edição (Nome/Categoria).
+* **Checkbox Otimista:** Feedback visual imediato + vibração tátil antes da resposta do servidor.
+* **Limpar Carrinho:** Soft delete (status \`comprado\` -> \`finalizado\`).
+* **Design System:** Tema "Cyberpunk Dark Neon" (Cores contrastantes para uso em ambientes claros/escuros).
+
+---
+
+## 5. Infraestrutura e Segurança
+
+### 5.1. Estrutura de Pastas (Host)
+\`\`\`text
+/opt/n8n-traefik/
+├── docker-compose.yml  # Orquestrador Mestre
+├── .env                # Variáveis Secretas (API Keys)
+├── letsencrypt/        # Certificados SSL
+└── familyos/
+    ├── Dockerfile      # Receita da Imagem
+    ├── src/            # Código Fonte Python/HTML/CSS
+    └── data/           # PERSISTÊNCIA (Banco de Dados)
+\`\`\`
+
+### 5.2. Segurança
+* **Chaves de API:** Armazenadas estritamente no arquivo \`.env\` na raiz, injetadas via Docker Compose.
+* **Banco de Dados:** Arquivo \`.db\` reside fora do container (Volume Mapeado) para garantir persistência pós-deploy.
+* **Autenticação Web:** Cookies de Sessão HTTPOnly/Secure/Lax.
+
+---
+
+## 6. Histórico de Evolução (Sprints)
+
+### ✅ Sprint 1-6: MVP e Estabilização
+* Deploy inicial, integração n8n, Login básico.
+
+### ✅ Sprint 7: Persistência e Robustez (Concluída em 02/12/2025)
+* **Problema Resolvido:** Perda de dados ao reiniciar container.
+* **Solução:** Implementação de Volumes Docker corretos.
+* **Fix IA:** Migração para \`gemini-pro\` e parser JSON resiliente.
+* **Fix DB:** Ativação de modo WAL para evitar erros de travamento (Database Locked).
+* **Refatoração:** Limpeza total ("Terra Arrasada") e unificação de redes Docker.
+
+### 🚧 Sprint 8: Refinamento e Expansão (Planejada)
+* **Foco:** Usabilidade e Feedback em Tempo Real.
+* **Backlog:**
+    * Feedback no Frontend quando a IA está processando (WebSocket/Polling).
+    * Suporte a múltiplas listas (Mercado vs Farmácia).
+    * Dashboard de gastos (Analytics básico).
+
+---
+
+## 7. Procedimentos de Manutenção
+
+### Atualizar Aplicação
+\`\`\`bash
+cd /opt/n8n-traefik
+docker compose up -d --build familyos-app
+\`\`\`
+
+### Debugar Erros (Logs em Tempo Real)
+\`\`\`bash
+docker logs -f familyos_app
+\`\`\`
+
+### Resetar Banco de Dados (Zerar Tudo)
+\`\`\`bash
+docker exec familyos_app python src/reset_db.py
+\`\`\`
+
+---
+
+## 8. Estrutura de Arquivos e Deploy
+
+Esta seção descreve como os arquivos do seu ambiente de desenvolvimento (VS Code / Windows) devem ser organizados para garantir um deploy suave para a produção (VPS / Docker).
+
+### 8.1. Estrutura do Projeto (VS Code)
+Esta é a árvore de arquivos que você deve manter no seu computador local (\`C:\\Users\\thiag\\langchain\\projects\\todo_market_list\`).
+
+\`\`\`text
+todo_market_list/
+├── .env                # Variáveis locais (NÃO COMMITAR)
+├── .gitignore          # Ignora .env, __pycache__, data/
+├── README.md           # Documentação Geral
+├── requirements.txt    # Bibliotecas Python
+├── deploy_pack/        # Pasta usada para enviar arquivos para a VPS (opcional)
+├── data/               # Banco de Dados Local (SQLite)
+├── docs/               # Documentação Técnica
+│   ├── api_docs.md
+│   ├── env_setup_docker.md
+│   ├── frontend_docs.md
+│   └── project_specs.md
+└── src/                # Código Fonte da Aplicação
+    ├── app.py          # O "Cérebro" (Backend Flask)
+    ├── reset_db.py     # Script para zerar/popular o banco
+    ├── static/
+    │   └── css/
+    │       └── styles.css  # Estilos (Tema Cyberpunk)
+    └── templates/
+        ├── index.html  # Frontend (Lista)
+        └── login.html  # Frontend (Login)
+\`\`\`
+
+### 8.2. Mapeamento para Produção (VPS)
+Quando subimos para a VPS, a estrutura muda ligeiramente pois o Docker assume o controle.
+
+| Arquivo Local (Windows) | Caminho na VPS (Linux) | Caminho DENTRO do Container |
+| :--- | :--- | :--- |
+| \`src/*\` | \`/opt/n8n-traefik/familyos/src/*\` | \`/app/src/*\` |
+| \`requirements.txt\` | \`/opt/n8n-traefik/familyos/requirements.txt\` | \`/app/requirements.txt\` |
+| \`Dockerfile\` | \`/opt/n8n-traefik/familyos/Dockerfile\` | N/A (Usado no build) |
+| \`data/familyos.db\` | \`/opt/n8n-traefik/familyos/data/familyos.db\` | \`/app/data/familyos.db\` |
+| \`.env\` | \`/opt/n8n-traefik/.env\` | Variáveis de Ambiente |
+
+### 8.3. Fluxo de Trabalho (Workflow)
+1.  **Codar:** Faça as alterações no VS Code (pasta \`src\`).
+2.  **Testar:** Rode localmente (`python src/app.py`) para validar.
+3.  **Commitar:** Use o Git para salvar a versão.
+4.  **Deploy:**
+    * Copie a pasta \`src\` e o arquivo \`requirements.txt\` para a VPS (via SSH).
+    * Na VPS, rode: \`docker compose up -d --build familyos-app\`.

@@ -3,51 +3,65 @@ import re
 import json
 import datetime
 import logging
+import traceback
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from sqlalchemy.orm import joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, event
+from sqlalchemy.engine import Engine
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+# --- LOGS E CONFIG ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 load_dotenv()
 
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "uma_chave_super_secreta_e_segura")
+base_dir = os.path.abspath(os.path.dirname(__file__))
+template_dir = os.path.join(base_dir, 'templates')
+static_dir = os.path.join(base_dir, 'static')
 
-# --- CONFIGURAÇÃO ROBUSTA DO BANCO DE DADOS (SPRINT 7) ---
-# Garante caminho absoluto para evitar erros no Windows/Docker
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.join(os.path.dirname(BASE_DIR), 'data')
-DB_FILE = os.path.join(DATA_DIR, 'todo_market.db')
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_FILE}'
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
+app.secret_key = os.getenv("SECRET_KEY", "segredo")
+
+db_path = '/app/data/familyos.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# --- MODELOS ---
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db.session.remove()
 
+# --- MODELS ---
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
     def check_password(self, password):
-        if self.password_hash in ['2904', '1712']:
-            return self.password_hash == password
+        if self.password_hash in ['2904', '1712']: return self.password_hash == password
         return check_password_hash(self.password_hash, password)
 
 class Categoria(db.Model):
@@ -68,286 +82,167 @@ class Produto(db.Model):
     emoji = db.Column(db.String(10), nullable=True)
     categoria_id = db.Column(db.Integer, db.ForeignKey('categorias.id'))
     unidade_padrao_id = db.Column(db.Integer, db.ForeignKey('unidades_medida.id'))
-    
     categoria = db.relationship('Categoria', backref='produtos')
     unidade_padrao = db.relationship('UnidadeMedida', backref='produtos')
-
-class TipoLista(db.Model):
-    __tablename__ = 'tipos_lista'
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(50), nullable=False, unique=True)
 
 class ListaItem(db.Model):
     __tablename__ = 'lista_itens'
     id = db.Column(db.Integer, primary_key=True)
     produto_id = db.Column(db.Integer, db.ForeignKey('produtos.id'))
-    tipo_lista_id = db.Column(db.Integer, db.ForeignKey('tipos_lista.id'), default=1)
     quantidade = db.Column(db.Float, nullable=False)
     unidade_id = db.Column(db.Integer, db.ForeignKey('unidades_medida.id'))
     usuario = db.Column(db.String(50))
     status = db.Column(db.String(20), default='pendente')
     adicionado_em = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     origem_input = db.Column(db.String(100))
-
     produto = db.relationship('Produto', backref='itens_lista')
     unidade = db.relationship('UnidadeMedida')
-    tipo_lista = db.relationship('TipoLista')
 
-# --- HELPER: SANITIZAÇÃO DE DADOS ---
-def sanitizar_texto(texto, tipo):
-    """
-    Remove espaços extras (começo, fim e meio).
-    tipo='categoria': Retorna UPPERCASE.
-    tipo='item': Retorna lowercase.
-    """
-    if not texto: return ""
-    limpo = " ".join(texto.split()) # Remove espaços duplos internos
-    if tipo == 'categoria':
-        return limpo.upper()
-    return limpo.lower()
-
-# --- CONFIGURAÇÃO DE LOGIN ---
 @login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+def load_user(user_id): return db.session.get(User, int(user_id))
 
-# --- IA ---
-model = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.0)
-
-prompt_template = """
-Extraia os itens de compra. Retorne LISTA JSON.
-Converta nomes para singular e minúsculas.
-Retorne um campo 'emoji' visualmente correspondente ao item.
-Categorias Sugeridas: Hortifrúti, Padaria, Carnes, Limpeza, Bebidas, Churrasco, Laticínios, Outros.
-
-Exemplo: [{{"nome": "leite", "quantidade": 2, "unidade": "L", "categoria": "Laticínios", "emoji": "🥛"}}]
-Campos: nome, quantidade (float), unidade (símbolo: kg, g, L, ml, un), categoria, emoji.
-Texto: {texto}
-"""
-prompt = ChatPromptTemplate.from_template(prompt_template)
-chain = prompt | model
-
-# --- ROTAS DE AUTH ---
-
+# --- ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('home'))
-    
+    if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            login_user(user)
+        u = request.form.get('username')
+        p = request.form.get('password')
+        user = User.query.filter(User.username.ilike(u.strip())).first()
+        if user and user.check_password(p):
+            login_user(user, remember=True)
             return redirect(url_for('home'))
-        else:
-            flash('Usuário ou senha inválidos')
-            
+        flash('Erro login')
     return render_template('login.html')
 
 @app.route('/logout')
 @login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
+def logout(): logout_user(); return redirect(url_for('login'))
 
-# --- ROTAS DA APLICAÇÃO (PROTEGIDAS) ---
-
-@app.route('/', methods=['GET'])
+@app.route('/')
 @login_required
 def home():
-    try:
-        itens = ListaItem.query.options(
-            joinedload(ListaItem.produto).joinedload(Produto.categoria),
-            joinedload(ListaItem.unidade)
-        ).filter(or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')).order_by(ListaItem.adicionado_em.desc()).all()
-        
-        categorias_view = {}
-        for item in itens:
-            if not item.produto: continue
-            
-            # Garante que a exibição respeite a normalização
-            cat_nome = item.produto.categoria.nome if item.produto.categoria else "OUTROS"
-            
-            if cat_nome not in categorias_view: categorias_view[cat_nome] = []
-            
-            qtd = int(item.quantidade) if item.quantidade and item.quantidade % 1 == 0 else item.quantidade
-            und = item.unidade.simbolo if item.unidade else ""
-            
-            categorias_view[cat_nome].append({
-                'id': item.id,
-                'nome': item.produto.nome.title(), # Title Case só pra visualização
-                'emoji': item.produto.emoji or "🛒",
-                'detalhes': f"{qtd}{und}" if und else str(qtd),
-                'usuario': item.usuario,
-                'status': item.status
-            })
-            
-        return render_template('index.html', categorias=categorias_view)
-    except Exception as e:
-        return f"Erro crítico: {str(e)}"
+    itens = ListaItem.query.options(joinedload(ListaItem.produto).joinedload(Produto.categoria), joinedload(ListaItem.unidade)).filter(or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')).order_by(ListaItem.adicionado_em.desc()).all()
+    view = {}
+    for i in itens:
+        c = i.produto.categoria.nome if i.produto.categoria else "OUTROS"
+        if c not in view: view[c] = []
+        qtd = int(i.quantidade) if i.quantidade % 1 == 0 else i.quantidade
+        und = i.unidade.simbolo if i.unidade else ""
+        view[c].append({'id': i.id, 'nome': i.produto.nome.title(), 'emoji': i.produto.emoji, 'detalhes': f"{qtd}{und}", 'usuario': i.usuario, 'status': i.status})
+    return render_template('index.html', categorias=view)
 
-@app.route('/toggle_item/<int:item_id>', methods=['POST'])
+@app.route('/toggle_item/<int:id>', methods=['POST'])
 @login_required
-def toggle_item(item_id):
-    try:
-        item = ListaItem.query.get(item_id)
-        if not item: return jsonify({'status': 'error'}), 404
-        item.status = 'comprado' if item.status == 'pendente' else 'pendente'
+def toggle(id):
+    i = db.session.get(ListaItem, id)
+    if i:
+        i.status = 'comprado' if i.status == 'pendente' else 'pendente'
         db.session.commit()
-        return jsonify({'status': 'success', 'novo_status': item.status})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'success', 'novo_status': i.status})
+    return jsonify({'status': 'error'}), 404
 
 @app.route('/clear_cart', methods=['POST'])
 @login_required
-def clear_cart():
-    try:
-        itens = ListaItem.query.filter_by(status='comprado').all()
-        for item in itens: item.status = 'finalizado'
-        db.session.commit()
-        return jsonify({'status': 'success'}), 200
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+def clear():
+    db.session.query(ListaItem).filter(ListaItem.status=='comprado').update({'status': 'finalizado'})
+    db.session.commit()
+    return jsonify({'status': 'success'})
 
-# --- ROTA DE ATUALIZAÇÃO (NORMALIZADA) ---
 @app.route('/update_item', methods=['POST'])
 @login_required
-def update_item():
-    data = request.get_json()
-    if not data or 'id' not in data or 'nome' not in data or 'categoria' not in data:
-        return jsonify({'error': 'Dados inválidos.'}), 400
+def update():
+    d = request.get_json()
+    i = db.session.get(ListaItem, int(d.get('id')))
+    if not i: return jsonify({'error': '404'}), 404
+    cat_nome = d.get('categoria').upper().strip()
+    prod_nome = d.get('nome').lower().strip()
+    cat = Categoria.query.filter_by(nome=cat_nome).first()
+    if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
+    prod = Produto.query.filter_by(nome=prod_nome).first()
+    if not prod:
+        prod = Produto(nome=prod_nome, categoria_id=cat.id, emoji=i.produto.emoji, unidade_padrao_id=i.produto.unidade_padrao_id)
+        db.session.add(prod); db.session.flush()
+    else: prod.categoria_id = cat.id
+    i.produto_id = prod.id
+    db.session.commit()
+    return jsonify({'message': 'OK'})
 
-    try:
-        item_id = int(data.get('id'))
-        
-        # --- APLICAÇÃO DA REGRA DE SANITIZAÇÃO ---
-        novo_nome_produto = sanitizar_texto(data.get('nome'), 'item')
-        novo_nome_categoria = sanitizar_texto(data.get('categoria'), 'categoria')
-        # -----------------------------------------
-
-        item = ListaItem.query.get_or_404(item_id)
-        
-        # 1. Atualiza/Busca Categoria (NORMALIZADA)
-        categoria = Categoria.query.filter_by(nome=novo_nome_categoria).first()
-        if not categoria:
-            categoria = Categoria(nome=novo_nome_categoria)
-            db.session.add(categoria)
-            db.session.flush()
-
-        # 2. Atualiza/Busca Produto (NORMALIZADO)
-        produto = Produto.query.filter_by(nome=novo_nome_produto).first()
-        if not produto:
-            produto = Produto(
-                nome=novo_nome_produto, 
-                categoria_id=categoria.id,
-                emoji=item.produto.emoji, 
-                unidade_padrao_id=item.produto.unidade_padrao_id
-            )
-            db.session.add(produto)
-            db.session.flush()
-        else:
-            # Se o produto existe, atualizamos a categoria dele para refletir a edição
-            if produto.categoria_id != categoria.id:
-                produto.categoria_id = categoria.id
-
-        # 3. Religa o item
-        item.produto_id = produto.id
-        
-        db.session.commit()
-        return jsonify({'message': 'Item atualizado com sucesso!'})
-
-    except Exception as e:
-        db.session.rollback()
-        logging.error(f"Erro ao atualizar item: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# --- ROTA MAGIC (NORMALIZADA) ---
 @app.route('/magic', methods=['POST'])
-def magic_endpoint():
-    data = request.get_json()
-    if not data or 'texto' not in data: return jsonify({"erro": "JSON inválido"}), 400
-
-    texto = data['texto']
-    usuario = data.get('usuario', 'Anônimo')
-    
+def magic():
     try:
-        res = chain.invoke({"texto": texto})
-        clean_content = re.sub(r'```json|```', '', res.content).strip()
-        
-        try:
-            dados = json.loads(clean_content)
-        except:
-            fixed = re.sub(r'}\s*{', '}, {', clean_content)
-            dados = json.loads(f"[{fixed}]" if not fixed.startswith('[') else fixed)
+        model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
+        chain = ChatPromptTemplate.from_template("JSON Lista (nome, quantidade, unidade, categoria, emoji) do texto: {texto}") | model
+    except Exception as e:
+        logger.error(f"Erro Config IA: {e}")
+        return jsonify({'erro': str(e)}), 503
+
+    d = request.get_json()
+    if not d or 'texto' not in d: return jsonify({'erro': 'JSON invalido'}), 400
+
+    try:
+        logger.info(f"Texto: {d.get('texto')}")
+        res = chain.invoke({"texto": d.get('texto')})
+        content = res.content
+        logger.info(f"Raw IA: {content}")
+
+        # --- PARSER JSON (INFALÍVEL) ---
+        start_idx = content.find('[')
+        end_idx = content.rfind(']')
+        if start_idx != -1 and end_idx != -1:
+            json_str = content[start_idx:end_idx+1]
+            dados = json.loads(json_str)
+        else:
+            clean = re.sub(r'', '', content).strip()
+            dados = json.loads(clean)
 
         if isinstance(dados, dict): dados = [dados]
 
+        # --- LOGICA DE FEEDBACK DETALHADO ---
         itens_salvos = []
         itens_ignorados = []
 
-        for item in dados:
-            # --- APLICAÇÃO DA REGRA DE SANITIZAÇÃO (INPUT IA) ---
-            cat_raw = item.get('categoria', 'OUTROS')
-            nome_raw = item.get('nome', 'item desconhecido')
-            
-            nome_clean = sanitizar_texto(nome_raw, 'item')
-            cat_clean = sanitizar_texto(cat_raw, 'categoria')
-            # ----------------------------------------------------
+        for x in dados:
+            n = x.get('nome', 'item').lower().strip()
+            c_nome = x.get('categoria', 'OUTROS').upper().strip()
+            if not n: continue
 
-            # Busca/Cria Categoria Normalizada
-            cat = Categoria.query.filter(Categoria.nome == cat_clean).first()
-            if not cat:
-                cat = Categoria(nome=cat_clean)
-                db.session.add(cat)
-                db.session.flush()
+            cat = Categoria.query.filter_by(nome=c_nome).first()
+            if not cat: cat = Categoria(nome=c_nome); db.session.add(cat); db.session.flush()
 
-            und = UnidadeMedida.query.filter(UnidadeMedida.simbolo.ilike(f"{item.get('unidade')}")).first()
-            
-            # Busca/Cria Produto Normalizado
-            prod = Produto.query.filter(Produto.nome == nome_clean).first()
+            und = UnidadeMedida.query.filter_by(simbolo=x.get('unidade','un')).first()
+            prod = Produto.query.filter_by(nome=n).first()
             if not prod:
-                prod = Produto(
-                    nome=nome_clean, 
-                    emoji=item.get('emoji'),
-                    categoria_id=cat.id, 
-                    unidade_padrao_id=und.id if und else None
-                )
-                db.session.add(prod)
-                db.session.flush()
-            else:
-                if not prod.emoji and item.get('emoji'):
-                    prod.emoji = item.get('emoji')
+                prod = Produto(nome=n, emoji=x.get('emoji'), categoria_id=cat.id, unidade_padrao_id=und.id if und else None)
+                db.session.add(prod); db.session.flush()
 
-            # Verifica duplicidade na lista (agora mais preciso)
-            existe = ListaItem.query.filter(ListaItem.produto_id == prod.id, or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')).first()
+            # Verifica Duplicidade (Pendente ou Comprado)
+            existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, or_(ListaItem.status=='pendente', ListaItem.status=='comprado')).first()
+
             if existe:
-                itens_ignorados.append(prod.nome)
-                continue
-
-            novo_item = ListaItem(
-                produto_id=prod.id,
-                quantidade=item.get('quantidade') or 1,
-                unidade_id=und.id if und else None,
-                usuario=usuario,
-                origem_input="telegram_voice"
-            )
-            db.session.add(novo_item)
-            itens_salvos.append(prod.nome)
+                # Se ja existe, adiciona na lista de ignorados
+                itens_ignorados.append(prod.nome.title())
+            else:
+                # Se nao existe, cria e salva
+                db.session.add(ListaItem(produto_id=prod.id, quantidade=x.get('quantidade', 1), usuario=d.get('usuario','Anônimo'), origem_input="voice"))
+                itens_salvos.append(prod.nome.title())
 
         db.session.commit()
-        
+
+        # MONTA A RESPOSTA PARA O TELEGRAM
         msg_parts = []
         if itens_salvos: msg_parts.append(f"✅ Adicionados: {', '.join(itens_salvos)}")
         if itens_ignorados: msg_parts.append(f"⚠️ Já na lista: {', '.join(itens_ignorados)}")
-        
-        return jsonify({"message": " | ".join(msg_parts) if msg_parts else "Nenhum item novo."}), 201
+
+        final_msg = " | ".join(msg_parts) if msg_parts else "Nenhum item identificado."
+
+        return jsonify({"message": final_msg}), 201
 
     except Exception as e:
+        logger.error(f"ERRO MAGIC: {traceback.format_exc()}")
         db.session.rollback()
-        return jsonify({"erro": str(e)}), 500
+        return jsonify({"erro": f"Erro interno: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    with app.app_context(): db.create_all()
+    app.run(host='0.0.0.0', port=5000)

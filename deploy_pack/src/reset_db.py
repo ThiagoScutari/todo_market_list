@@ -1,41 +1,37 @@
-from app import app, db, Categoria, UnidadeMedida, TipoLista
+from app import app, db, User, Categoria, UnidadeMedida, TipoLista
 
 def resetar_banco():
+    print(f"🔧 Configuração de Banco: {app.config['SQLALCHEMY_DATABASE_URI']}")
+    
     with app.app_context():
-        # 1. Apaga tudo e recria as tabelas baseadas no app.py
-        print("🗑️  Apagando banco antigo...")
+        # Apaga e recria
         db.drop_all()
-        print("🔨 Criando novas tabelas...")
         db.create_all()
-
-        # 2. Insere Dados Iniciais (Seed)
-        print("🌱 Semeando dados...")
         
-        # Categorias
-        categorias = ['Hortifrúti', 'Padaria', 'Carnes', 'Limpeza', 'Bebidas', 'Mercearia', 'Outros']
-        for c in categorias:
-            db.session.add(Categoria(nome=c))
-
-        # Unidades
+        # Cria Usuários
+        user_thiago = User(username='thiago', password_hash='2904')
+        user_debora = User(username='debora', password_hash='1712')
+        db.session.add(user_thiago)
+        db.session.add(user_debora)
+        
+        # Cria Categorias Básicas
+        cats = ['Hortifrúti', 'Padaria', 'Carnes', 'Limpeza', 'Bebidas', 'Outros']
+        for c in cats:
+            db.session.add(Categoria(nome=c.upper())) # Força upper conforme sua regra
+            
+        # Cria Unidades
         unidades = [
+            {'nome': 'unidade', 'simbolo': 'un'},
             {'nome': 'quilograma', 'simbolo': 'kg'},
             {'nome': 'grama', 'simbolo': 'g'},
             {'nome': 'litro', 'simbolo': 'L'},
-            {'nome': 'mililitro', 'simbolo': 'ml'},
-            {'nome': 'unidade', 'simbolo': 'un'},
-            {'nome': 'pacote', 'simbolo': 'pct'},
-            {'nome': 'caixa', 'simbolo': 'cx'}
+            {'nome': 'pacote', 'simbolo': 'pct'}
         ]
         for u in unidades:
             db.session.add(UnidadeMedida(nome=u['nome'], simbolo=u['simbolo']))
 
-        # Tipos de Lista
-        tipos = ['Mercado', 'Farmácia', 'Casa']
-        for t in tipos:
-            db.session.add(TipoLista(nome=t))
-
         db.session.commit()
-        print("✅ Banco de dados recriado e populado com sucesso!")
+        print("✅ Banco resetado e populado com sucesso!")
 
 if __name__ == "__main__":
     resetar_banco()
