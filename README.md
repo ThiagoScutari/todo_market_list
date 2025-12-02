@@ -13,18 +13,22 @@ O **FamilyOS** é um sistema híbrido de gestão doméstica inteligente, focado 
 
 ### 1. Entrada de Dados "Zero UI" (Telegram)
 A interface de entrada é o Telegram. O sistema aceita áudios com linguagem natural ("preciso de 3 ovos e uma caixa de leite") ou texto direto. O bot confirma o recebimento e avisa se o item foi adicionado ou se já existia na lista.
-![Interação Telegram](images/telegram.png)
+
+![Interação Telegram](images/telegram.jpg)
 
 ### 2. O Cérebro (Orquestração n8n)
 O **n8n** atua como o sistema nervoso, recebendo o webhook do Telegram, processando o áudio via Whisper e enviando para a API Python estruturar os dados com a IA do Google.
+
 ![Fluxo n8n](images/n8n.png)
 
 ### 3. Segurança (Acesso Familiar)
 O sistema conta com uma camada de autenticação via Cookies de Sessão para garantir que apenas a família tenha acesso à gestão.
+
 ![Tela de Login](images/login.jpg)
 
 ### 4. A Lista Inteligente (Web App Mobile-First)
 Uma interface limpa com design **Cyberpunk Dark Neon**. O sistema agrupa automaticamente os itens por categorias (Padaria, Laticínios, Higiene) para otimizar o trajeto dentro do supermercado.
+
 ![Interface Principal](images/item_list.jpg)
 
 ---
@@ -35,14 +39,17 @@ O FamilyOS foi desenhado para ser usado com uma mão só enquanto se empurra um 
 
 ### Feedback Visual Instantâneo
 Ao marcar um item, ele recebe um feedback visual imediato (check verde neon e vibração tátil). A sincronização com o servidor acontece em segundo plano (Optimistic UI).
+
 ![Checkbox Ativo](images/checkbox.jpg)
 
 ### Edição Rápida (Long Press)
 Errou o nome ou a categoria? Não precisa apagar. Segure o dedo sobre o item por **800ms** para abrir o Modal de Edição. O campo de categoria possui *autocomplete* inteligente.
+
 ![Modal de Edição](images/modal_longpress.jpg)
 
 ### Limpeza de Carrinho (Soft Delete)
 Ao finalizar as compras, o botão "Limpar Carrinho" arquiva os itens comprados, mantendo-os no banco de dados para histórico futuro, mas limpando a visualização principal.
+
 ![Arquivar Itens](images/arquivar_itens.jpg)
 
 ---
