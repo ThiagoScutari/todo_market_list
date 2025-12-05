@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 import datetime
 
@@ -48,6 +48,23 @@ class ListaItem(Base):
     status = Column(String(20), default='pendente')
     adicionado_em = Column(DateTime, default=datetime.datetime.utcnow)
     origem_input = Column(String(100))
+
+class Task(Base):
+    __tablename__ = 'tasks'
+    id = Column(Integer, primary_key=True)
+    descricao = Column(String(200), nullable=False)
+    responsavel = Column(String(50), default='Casal')
+    prioridade = Column(Integer, default=1) # 1=Baixa, 2=Media, 3=Alta
+    status = Column(String(20), default='pendente')
+    prazo = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class WeatherCache(Base):
+    __tablename__ = 'weather_cache'
+    id = Column(Integer, primary_key=True)
+    city = Column(String(50), default='Itajaí')
+    data_json = Column(Text, nullable=False)
+    last_updated = Column(DateTime, default=datetime.datetime.utcnow)
 
 # --- SCRIPT DE INICIALIZAÇÃO ---
 

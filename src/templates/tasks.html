@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Tarefas - FamilyOS{% endblock %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background: rgba(34, 255, 122, 0.1); color:#22ff7a; padding:10px; border-radius:8px; margin-bottom:15px; text-align:center; border:1px solid #22ff7a;">
+                {{ messages[0] }}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% for responsavel, lista_tarefas in tasks.items() %}
+    <div class="category-section">
+        <div class="category-header" onclick="toggleSection(this)" 
+             style="border-left-color: {% if responsavel == 'Casal' %}#ffb800{% else %}#611af0{% endif %}">
+            <span style="display:flex; align-items:center; gap:8px;">
+                {% if responsavel == 'Casal' %}<i class="bi bi-people-fill"></i>
+                {% else %}<i class="bi bi-person-fill"></i>{% endif %}
+                {{ responsavel }}
+            </span>
+            <span style="opacity:0.5; font-size:0.8em">({{ lista_tarefas|length }})</span>
+        </div>
+        
+        <div class="product-list">
+            {% if not lista_tarefas %}
+                <div style="padding:15px; text-align:center; color:rgba(255,255,255,0.3); font-size:0.9rem;">
+                    Nada pendente.
+                </div>
+            {% endif %}
+
+            {% for task in lista_tarefas %}
+            <div class="product-card {% if task.status == 'concluido' %}checked{% endif %}" 
+                 id="task-{{ task.id }}">
+                
+                <div class="product-info">
+                    <div class="product-name" style="display:flex; align-items:center; gap:8px;">
+                        {{ task.descricao }}
+                        
+                        {% if task.prioridade == 3 %}
+                            <span title="Alta Prioridade" style="width:8px; height:8px; background:#ff3131; border-radius:50%; box-shadow:0 0 5px #ff3131;"></span>
+                        {% elif task.prioridade == 2 %}
+                            <span title="Média Prioridade" style="width:8px; height:8px; background:#ffb800; border-radius:50%;"></span>
+                        {% endif %}
+                    </div>
+                    <div class="product-meta">
+                        {{ task.created_at.strftime('%d/%m') }} • 
+                        <span style="color: {% if task.prioridade == 3 %}#ff3131{% else %}inherit{% endif %}">
+                            {% if task.prioridade == 3 %}Urgente{% elif task.prioridade == 2 %}Importante{% else %}Normal{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="check-task-{{ task.id }}" 
+                           onchange="toggleTask(this, {{ task.id }})"
+                           {% if task.status == 'concluido' %}checked{% endif %}>
+                    <label for="check-task-{{ task.id }}"></label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div style="height: 20px;"></div>
+    <button class="btn-clear-large" onclick="clearTasks()">
+        <i class="bi bi-check2-all"></i> Arquivar Concluídas
+    </button>
+    <div style="height: 80px;"></div>
+    
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleSection(header) {
+        const lista = header.nextElementSibling;
+        lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleTask(checkbox, id) {
+        const card = document.getElementById('task-' + id);
+        
+        if (checkbox.checked) {
+            // Apenas risca, NÃO SOME MAIS
+            card.classList.add('checked');
+            if (navigator.vibrate) navigator.vibrate(50);
+        } else {
+            card.classList.remove('checked');
+        }
+
+        // Chama o Backend
+        fetch('/toggle_task/' + id, { method: 'POST' });
+    }
+
+    function clearTasks() {
+        if (confirm('Arquivar tarefas concluídas?')) {
+            fetch('/clear_tasks', { method: 'POST' }).then(() => location.reload());
+        }
+    }
+</script>
+{% endblock %}

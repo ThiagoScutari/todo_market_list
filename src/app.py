@@ -4,6 +4,7 @@ import json
 import datetime
 import logging
 import traceback
+import requests
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -14,9 +15,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, event
-from sqlalchemy.engine import Engine
 
-# --- LOGS E CONFIG ---
+# Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -34,18 +34,20 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
 app.secret_key = os.getenv("SECRET_KEY", "segredo")
 
-db_path = '/app/data/familyos.db'
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+# --- CONEXÃO BANCO (Postgres) ---
+database_url = os.getenv('DATABASE_URL')
+if not database_url:
+    # Fallback local apenas para segurança, mas deve usar o .env
+    db_path = os.path.join(os.path.dirname(base_dir), 'data', 'familyos.db')
+    database_url = f'sqlite:///{db_path}'
+
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA synchronous=NORMAL")
-    cursor.close()
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -54,7 +56,8 @@ login_manager.login_view = 'login'
 def shutdown_session(exception=None):
     db.session.remove()
 
-# --- MODELS ---
+# --- MODELS (Tabelas) ---
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -98,20 +101,39 @@ class ListaItem(db.Model):
     produto = db.relationship('Produto', backref='itens_lista')
     unidade = db.relationship('UnidadeMedida')
 
+# --- NOVOS MODELS V2.0 ---
+
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    responsavel = db.Column(db.String(50)) # Thiago, Debora, Casal
+    prioridade = db.Column(db.Integer, default=1) # 1=Baixa, 2=Media, 3=Alta
+    status = db.Column(db.String(20), default='pendente')
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+class WeatherCache(db.Model):
+    __tablename__ = 'weather_cache'
+    id = db.Column(db.Integer, primary_key=True)
+    city = db.Column(db.String(50))
+    data_json = db.Column(db.Text) # JSON string da API externa
+    last_updated = db.Column(db.DateTime)
+
 @login_manager.user_loader
 def load_user(user_id): return db.session.get(User, int(user_id))
 
-# --- ROUTES ---
+# --- ROTAS DE NAVEGAÇÃO (VIEWS) ---
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated: return redirect(url_for('home'))
+    if current_user.is_authenticated: return redirect(url_for('dashboard'))
     if request.method == 'POST':
         u = request.form.get('username')
         p = request.form.get('password')
         user = User.query.filter(User.username.ilike(u.strip())).first()
         if user and user.check_password(p):
             login_user(user, remember=True)
-            return redirect(url_for('home'))
+            return redirect(url_for('dashboard'))
         flash('Erro login')
     return render_template('login.html')
 
@@ -121,7 +143,25 @@ def logout(): logout_user(); return redirect(url_for('login'))
 
 @app.route('/')
 @login_required
-def home():
+def dashboard():
+    # Calcula contadores para os Badges
+    qtd_compras = ListaItem.query.filter_by(status='pendente').count()
+    qtd_tarefas = Task.query.filter_by(status='pendente').count()
+    
+    # Placeholder para Clima e Mensagem (Implementaremos a lógica real na proxima etapa)
+    clima = {"temp": 28, "icon": "bi-cloud-sun"} 
+    mensagem = "O sucesso começa com a organização."
+
+    return render_template('dashboard.html', 
+                           active_page='dashboard',
+                           qtd_compras=qtd_compras,
+                           qtd_tarefas=qtd_tarefas,
+                           clima=clima,
+                           mensagem=mensagem)
+
+@app.route('/shopping')
+@login_required
+def shopping_list():
     itens = ListaItem.query.options(joinedload(ListaItem.produto).joinedload(Produto.categoria), joinedload(ListaItem.unidade)).filter(or_(ListaItem.status == 'pendente', ListaItem.status == 'comprado')).order_by(ListaItem.adicionado_em.desc()).all()
     view = {}
     for i in itens:
@@ -130,7 +170,29 @@ def home():
         qtd = int(i.quantidade) if i.quantidade % 1 == 0 else i.quantidade
         und = i.unidade.simbolo if i.unidade else ""
         view[c].append({'id': i.id, 'nome': i.produto.nome.title(), 'emoji': i.produto.emoji, 'detalhes': f"{qtd}{und}", 'usuario': i.usuario, 'status': i.status})
-    return render_template('index.html', categorias=view)
+    return render_template('shopping.html', categorias=view, active_page='shopping')
+
+@app.route('/tasks')
+@login_required
+def task_board():
+    # ALTERAÇÃO: Busca pendentes E concluidas (para não sumir da tela)
+    tasks = Task.query.filter(or_(Task.status=='pendente', Task.status=='concluido')).order_by(Task.prioridade.desc(), Task.created_at.asc()).all()
+    
+    view = {'Thiago': [], 'Debora': [], 'Casal': []}
+    for t in tasks:
+        resp = t.responsavel if t.responsavel in view else 'Thiago'
+        view[resp].append(t)
+    return render_template('tasks.html', tasks=view, active_page='tasks')
+
+@app.route('/clear_tasks', methods=['POST'])
+@login_required
+def clear_tasks():
+    # Nova rota para arquivar tarefas feitas
+    db.session.query(Task).filter(Task.status=='concluido').update({'status': 'arquivado'})
+    db.session.commit()
+    return jsonify({'status': 'success'})
+
+# --- API ENDPOINTS (MERCADO) ---
 
 @app.route('/toggle_item/<int:id>', methods=['POST'])
 @login_required
@@ -160,7 +222,7 @@ def update():
     cat = Categoria.query.filter_by(nome=cat_nome).first()
     if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
     prod = Produto.query.filter_by(nome=prod_nome).first()
-    if not prod:
+    if not prod: 
         prod = Produto(nome=prod_nome, categoria_id=cat.id, emoji=i.produto.emoji, unidade_padrao_id=i.produto.unidade_padrao_id)
         db.session.add(prod); db.session.flush()
     else: prod.categoria_id = cat.id
@@ -170,6 +232,7 @@ def update():
 
 @app.route('/magic', methods=['POST'])
 def magic():
+    # --- MODELO GEMINI PRO ---
     try:
         model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
         chain = ChatPromptTemplate.from_template("JSON Lista (nome, quantidade, unidade, categoria, emoji) do texto: {texto}") | model
@@ -185,64 +248,168 @@ def magic():
         res = chain.invoke({"texto": d.get('texto')})
         content = res.content
         logger.info(f"Raw IA: {content}")
-
-        # --- PARSER JSON (INFALÍVEL) ---
+        
         start_idx = content.find('[')
         end_idx = content.rfind(']')
         if start_idx != -1 and end_idx != -1:
             json_str = content[start_idx:end_idx+1]
             dados = json.loads(json_str)
         else:
-            clean = re.sub(r'', '', content).strip()
+            clean = re.sub(r'```json|```', '', content).strip()
             dados = json.loads(clean)
 
         if isinstance(dados, dict): dados = [dados]
-
-        # --- LOGICA DE FEEDBACK DETALHADO ---
+        
         itens_salvos = []
         itens_ignorados = []
-
+        
         for x in dados:
             n = x.get('nome', 'item').lower().strip()
             c_nome = x.get('categoria', 'OUTROS').upper().strip()
             if not n: continue
-
             cat = Categoria.query.filter_by(nome=c_nome).first()
             if not cat: cat = Categoria(nome=c_nome); db.session.add(cat); db.session.flush()
-
             und = UnidadeMedida.query.filter_by(simbolo=x.get('unidade','un')).first()
             prod = Produto.query.filter_by(nome=n).first()
-            if not prod:
+            if not prod: 
                 prod = Produto(nome=n, emoji=x.get('emoji'), categoria_id=cat.id, unidade_padrao_id=und.id if und else None)
                 db.session.add(prod); db.session.flush()
-
-            # Verifica Duplicidade (Pendente ou Comprado)
             existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, or_(ListaItem.status=='pendente', ListaItem.status=='comprado')).first()
-
             if existe:
-                # Se ja existe, adiciona na lista de ignorados
                 itens_ignorados.append(prod.nome.title())
             else:
-                # Se nao existe, cria e salva
                 db.session.add(ListaItem(produto_id=prod.id, quantidade=x.get('quantidade', 1), usuario=d.get('usuario','Anônimo'), origem_input="voice"))
                 itens_salvos.append(prod.nome.title())
-
         db.session.commit()
-
-        # MONTA A RESPOSTA PARA O TELEGRAM
+        
         msg_parts = []
         if itens_salvos: msg_parts.append(f"✅ Adicionados: {', '.join(itens_salvos)}")
         if itens_ignorados: msg_parts.append(f"⚠️ Já na lista: {', '.join(itens_ignorados)}")
-
-        final_msg = " | ".join(msg_parts) if msg_parts else "Nenhum item identificado."
-
-        return jsonify({"message": final_msg}), 201
+        return jsonify({"message": " | ".join(msg_parts) if msg_parts else "Nenhum item identificado."}), 201
 
     except Exception as e:
         logger.error(f"ERRO MAGIC: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({"erro": f"Erro interno: {str(e)}"}), 500
 
+# --- ENDPOINTS DE TAREFAS (v2.0) ---
+@app.route('/toggle_task/<int:id>', methods=['POST'])
+@login_required
+def toggle_task(id):
+    t = db.session.get(Task, id)
+    if t:
+        t.status = 'concluido' if t.status == 'pendente' else 'pendente'
+        db.session.commit()
+        return jsonify({'status': 'success', 'novo_status': t.status})
+    return jsonify({'status': 'error'}), 404
+
+# --- NOVO ENDPOINT DE TAREFAS (v2.1 - Multi-Tasks) ---
+@app.route('/tasks/magic', methods=['POST'])
+def tasks_magic():
+    # 1. Configura IA
+    try:
+        model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
+        
+        # Prompt Atualizado: Pede uma LISTA de objetos JSON
+        prompt = """
+        Você é um assistente de gestão doméstica. Analise o pedido e extraia uma LISTA de tarefas.
+        Se houver mais de uma ação na mesma frase, separe em itens diferentes.
+        
+        Retorne APENAS um JSON array neste formato:
+        [
+            {{
+                "descricao": "Ação 1",
+                "responsavel": "Quem?", 
+                "prioridade": 1, 2 ou 3
+            }},
+            {{
+                "descricao": "Ação 2",
+                ...
+            }}
+        ]
+
+        REGRAS DE RESPONSÁVEL:
+        - Se citar nome -> Usa o nome.
+        - Se citar 'nós/temos' -> "Casal".
+        - Se não citar -> "Outro".
+
+        REGRAS DE PRIORIDADE:
+        - 1 (Baixa/Verde): Rotina, sem data.
+        - 2 (Média/Amarela): Importante.
+        - 3 (Alta/Vermelha): Urgente, hoje, agora.
+
+        ### IMPORTANTE
+        Catharina e a neta do Casal, se escreve com 'h' Catharina.
+
+        Texto: {texto}
+        """
+        chain = ChatPromptTemplate.from_template(prompt) | model
+    except Exception as e: return jsonify({'erro': str(e)}), 503
+
+    d = request.get_json()
+    if not d: return jsonify({'erro': 'Sem dados'}), 400
+    
+    texto = d.get('texto')
+    remetente = d.get('remetente') or d.get('usuario') or 'Alguém'
+
+    try:
+        # 2. Processa IA
+        logger.info(f"Processando Tarefa: {texto}")
+        res = chain.invoke({"texto": texto})
+        content = res.content
+        
+        # Parser JSON de Lista (Blindado)
+        start_idx = content.find('[')
+        end_idx = content.rfind(']')
+        if start_idx != -1 and end_idx != -1:
+            dados = json.loads(content[start_idx:end_idx+1])
+        else:
+            # Tenta limpar markdown se não achar colchetes limpos
+            clean = re.sub(r'```json|```', '', content).strip()
+            # Se a IA devolveu um objeto único sem colchetes, envolve em lista
+            if clean.startswith('{'): clean = f"[{clean}]"
+            dados = json.loads(clean)
+
+        # Garante que seja uma lista
+        if isinstance(dados, dict): dados = [dados]
+
+        # 3. Processamento em Lote
+        msgs_telegram = []
+        
+        for item in dados:
+            # Lógica de Atribuição
+            resp_ia = item.get('responsavel', 'Outro')
+            if resp_ia == 'Outro':
+                responsavel_final = remetente
+            else:
+                responsavel_final = resp_ia.capitalize()
+
+            # Salva no Banco
+            nova_task = Task(
+                descricao=item.get('descricao'),
+                responsavel=responsavel_final,
+                prioridade=int(item.get('prioridade', 1)),
+                status='pendente'
+            )
+            db.session.add(nova_task)
+            
+            # Prepara mensagem de retorno
+            icones = {1: "🟢", 2: "🟡", 3: "🔴"}
+            p_icon = icones.get(nova_task.prioridade, "⚪")
+            msgs_telegram.append(f"✅ {responsavel_final}: {p_icon} {nova_task.descricao}")
+
+        db.session.commit()
+
+        # 4. Resposta Agrupada
+        return jsonify({
+            "message": "\n".join(msgs_telegram)
+        }), 201
+
+    except Exception as e:
+        logger.error(f"ERRO TASK: {traceback.format_exc()}")
+        db.session.rollback()
+        return jsonify({"erro": str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

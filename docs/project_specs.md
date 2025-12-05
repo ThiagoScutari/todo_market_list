@@ -1,215 +1,225 @@
-# Documento Mestre de Arquitetura: FamilyOS
+# Documentação FamilyOS v2.0 — Módulos e Funcionalidades
 
-**Versão:** v1.2 (Stable Persistence)
-**Data da Última Atualização:** 02/12/2025
-**Status:** ✅ Produção (Operacional)
+## 1. Visão Geral do Sistema
+O **FamilyOS v2.0** é um sistema operacional doméstico que unifica gestão de compras, tarefas, clima e inspiração diária em uma única plataforma.
 
----
-
-## 1. Introdução
-
-### 1.1. Propósito
-Este documento estabelece a arquitetura técnica, regras de negócio e infraestrutura do sistema **FamilyOS**. Ele serve como fonte única da verdade para manutenção e evolução do projeto, substituindo todas as versões anteriores.
-
-### 1.2. Escopo Atual
-O sistema opera como um assistente de gestão doméstica focado em **Compras de Mercado**.
-* **Entrada:** Áudio/Texto via Telegram (Zero UI).
-* **Processamento:** IA Generativa para estruturação de dados.
-* **Saída:** Web App Mobile-First para uso no supermercado (Rich UI).
+**Tecnologias:**
+- Backend: Python Flask + SQLite + SQLAlchemy
+- Frontend: HTML5, CSS3 (Cyberpunk Dark Neon), JavaScript Vanilla
+- IA: Google Gemini Pro
+- Infraestrutura: Docker + Traefik + n8n
 
 ---
 
-## 2. Visão Geral da Arquitetura
+## 2. Módulo Dashboard (Tela Inicial)
 
-O sistema segue uma arquitetura de microsserviços containerizados orquestrados via Docker Compose.
+### Layout
+A tela inicial é um Dashboard com:
 
-### 2.1. Diagrama de Fluxo
-\`\`\`
-[USUÁRIO] 🗣️ Áudio/Texto
-    ⬇
-[TELEGRAM]
-    ⬇
-[n8n] (Orquestrador)
-    │ • Recebe Webhook
-    │ • Baixa Áudio
-    │ • Transcreve (Whisper)
-    ⬇
-[API FAMILYOS] (Flask/Python) ◀─── [GOOGLE GEMINI PRO] (Inteligência)
-    │ • Recebe JSON
-    │ • Extrai Entidades (Nome, Qtd, Categoria)
-    │ • Verifica Duplicidade
-    │ • Persiste no SQLite
-    ⬇
-[BANCO DE DADOS] (SQLite / Wal Mode)
-    ⬆
-[WEB APP] (Browser Mobile)
-    │ • Renderiza Lista (Jinja2)
-    │ • Edição/Check (JS/Fetch)
-\`\`\`
+1. **Header:**
+   - Saudação dinâmica (“Bom dia, Thiago”)
+   - Ícone do clima + temperatura atual
+
+2. **Widget “Mensagem do Dia”**
+   - Card com fundo de vidro
+   - Frase inspiracional/religiosa (atualizada diariamente)
+
+3. **Widget “Estratégia do Tempo”**
+   - Resumo do dia (manhã/tarde/noite)
+   - Previsão do fim de semana (sábado e domingo)
+
+4. **Grid de Módulos (Botões Grandes):**
+   - 🛒 **Lista de Compras** (ativo, com badge de pendentes)
+   - ✅ **Tarefas** (ativo, com badge de alta prioridade)
+   - 🥗 **Inserir Ingredientes** (opaco, desabilitado)
+   - ⏰ **Lembretes** (opaco, desabilitado)
 
 ---
 
-## 3. Especificações Técnicas Detalhadas
+## 3. Módulo de Tarefas
 
-### 3.1. Stack Tecnológica
-* **Infraestrutura:** VPS Linux (HostGator), Docker, Docker Compose.
-* **Proxy/Segurança:** Traefik (SSL Automático, Roteamento reverso).
-* **Backend:** Python 3.11, Flask, Gunicorn, SQLAlchemy.
-* **Banco de Dados:** SQLite (com Write-Ahead Logging - WAL ativado para concorrência).
-* **Frontend:** HTML5, CSS3 (Variables), JavaScript Vanilla (ES6).
-* **IA:** LangChain + Google Gemini Pro.
+### Funcionalidades
+- Adição via Telegram (voz/texto) ou manualmente
+- Atribuição automática por IA:
+  - **Explícita:** Nome na frase → responsável nomeado
+  - **Coletiva:** “Temos que” → responsável “Casal”
+  - **Implícita:** Sem nome → atribui ao remetente
+- Classificação de prioridade:
+  - 🟢 Baixa (verde)
+  - 🟡 Média (amarelo)
+  - 🔴 Alta (vermelho) → notificação por e-mail
+- Agrupamento visual:
+  - 👤 Thiago
+  - 👤 Debora
+  - 👥 Casal
 
-### 3.2. Estrutura de Dados (Schema)
+### Interface
+- **Task Card:**
+  - Checkbox circular (esquerda)
+  - Descrição da tarefa (centro)
+  - Bolinha colorida de prioridade (direita)
+- **Interações:**
+  - Clique: marcar/desmarcar
+  - Long Press (800ms): abrir modal de edição
+- **Edição via modal:**
+  - Alterar responsável (dropdown: Thiago, Debora, Casal)
+  - Alterar prioridade (radio: baixa, média, alta)
 
-#### Tabela \`users\`
+### API Endpoints (Tarefas)
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/tasks/magic` | Processa texto natural, atribui responsável e prioridade |
+| POST | `/tasks/toggle/<id>` | Alterna status (pendente/concluído) |
+| POST | `/tasks/update` | Edita descrição, responsável ou prioridade |
+| GET | `/tasks` | Renderiza o quadro de tarefas (frontend) |
+
+---
+
+## 4. Módulo de Compras (Mantido v1.2)
+
+### Funcionalidades
+- Adição via Telegram (IA processa áudio/texto)
+- Categorização automática
+- Checkbox otimista com vibração
+- Edição via Long Press
+- Limpeza de carrinho (arquivamento)
+
+### API Endpoints (Compras)
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/magic` | Processa transcrição e insere itens |
+| POST | `/toggle_item/<id>` | Alterna status (pendente/comprado) |
+| POST | `/update_item` | Edita nome e categoria do item |
+| POST | `/clear_cart` | Arquivar itens comprados |
+| GET | `/shopping` | Renderiza a lista de compras |
+
+---
+
+## 5. API de Dados do Dashboard
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/weather` | Retorna dados meteorológicos cacheados (atualizado a cada 1h) |
+| GET | `/api/inspiration` | Retorna mensagem do dia (API externa ou banco local) |
+
+---
+
+## 6. Banco de Dados (Schema v2.0)
+
+### Tabela `tasks`
 | Campo | Tipo | Descrição |
-| :--- | :--- | :--- |
-| \`id\` | Integer | PK |
-| \`username\` | String | Login (thiago, debora) |
-| \`password_hash\` | String | Hash seguro (scrypt) |
+|-------|------|-----------|
+| id | Integer | PK |
+| descricao | String | Descrição da tarefa |
+| responsavel | String | 'Thiago', 'Debora', 'Casal' |
+| prioridade | Integer | 1=Baixa, 2=Média, 3=Alta |
+| status | String | 'pendente', 'concluido' |
+| prazo | DateTime | Opcional |
+| created_at | DateTime | Data de criação |
 
-#### Tabela \`lista_itens\` (Core)
+### Tabela `weather_cache`
 | Campo | Tipo | Descrição |
-| :--- | :--- | :--- |
-| \`id\` | Integer | PK |
-| \`produto_id\` | FK | Relacionamento com tabela produtos |
-| \`quantidade\` | Float | Ex: 1.5, 2.0 |
-| \`unidade_id\` | FK | Relacionamento com tabela unidades |
-| \`usuario\` | String | Quem pediu (audit) |
-| \`status\` | String | 'pendente', 'comprado', 'finalizado' |
-| \`adicionado_em\` | DateTime | Timestamp de criação |
-| \`origem_input\` | String | 'voice', 'manual' |
+|-------|------|-----------|
+| id | Integer | PK (singleton) |
+| city | String | 'Itajaí' |
+| data_json | JSON | Payload da API de clima |
+| last_updated | DateTime | Última atualização |
 
-*(Tabelas auxiliares: \`categorias\`, \`unidades_medida\`, \`produtos\`)*
-
----
-
-## 4. Funcionalidades e Regras de Negócio
-
-### 4.1. O "Magic Endpoint" (IA)
-* **Rota:** \`POST /magic\`
-* **Modelo IA:** \`gemini-pro\` (Estável).
-* **Lógica de Idempotência:**
-    * Se o item já existe na lista com status \`pendente\` ou \`comprado\`, a IA **ignora** e avisa "Já na lista".
-    * Se não existe, cria.
-* **Parsing:** Utiliza localizadores de bloco JSON (\`[\`, \`]\`) para ignorar Markdown ou texto extra da IA.
-
-### 4.2. Interface do Usuário (UX Mobile)
-* **Long Press (800ms):** Abre modal de edição (Nome/Categoria).
-* **Checkbox Otimista:** Feedback visual imediato + vibração tátil antes da resposta do servidor.
-* **Limpar Carrinho:** Soft delete (status \`comprado\` -> \`finalizado\`).
-* **Design System:** Tema "Cyberpunk Dark Neon" (Cores contrastantes para uso em ambientes claros/escuros).
+### Tabela `inspiration_cache`
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| id | Integer | PK (singleton) |
+| text | String | Texto da mensagem |
+| author | String | Autor (se houver) |
+| last_updated | DateTime | Última atualização |
 
 ---
 
-## 5. Infraestrutura e Segurança
+## 7. Integrações Externas
 
-### 5.1. Estrutura de Pastas (Host)
-\`\`\`text
-/opt/n8n-traefik/
-├── docker-compose.yml  # Orquestrador Mestre
-├── .env                # Variáveis Secretas (API Keys)
-├── letsencrypt/        # Certificados SSL
-└── familyos/
-    ├── Dockerfile      # Receita da Imagem
-    ├── src/            # Código Fonte Python/HTML/CSS
-    └── data/           # PERSISTÊNCIA (Banco de Dados)
-\`\`\`
+### 7.1 Meteorologia
+- **Provedor:** OpenWeatherMap ou HG Brasil
+- **Frequência:** Cache de 1 hora
+- **Dados:** Temperatura, condição, previsão 3 dias
 
-### 5.2. Segurança
-* **Chaves de API:** Armazenadas estritamente no arquivo \`.env\` na raiz, injetadas via Docker Compose.
-* **Banco de Dados:** Arquivo \`.db\` reside fora do container (Volume Mapeado) para garantir persistência pós-deploy.
-* **Autenticação Web:** Cookies de Sessão HTTPOnly/Secure/Lax.
+### 7.2 Mensagem do Dia
+- **Provedor:** API de citações (ex.: TheySaidSo) ou banco local
 
----
+### 7.3 n8n (Roteador de Intenção)
+1. Recebe webhook do Telegram
+2. Classifica intenção (`SHOPPING` ou `TASK`)
+3. Roteia para o endpoint correspondente (`/magic` ou `/tasks/magic`)
 
-## 6. Histórico de Evolução (Sprints)
-
-### ✅ Sprint 1-6: MVP e Estabilização
-* Deploy inicial, integração n8n, Login básico.
-
-### ✅ Sprint 7: Persistência e Robustez (Concluída em 02/12/2025)
-* **Problema Resolvido:** Perda de dados ao reiniciar container.
-* **Solução:** Implementação de Volumes Docker corretos.
-* **Fix IA:** Migração para \`gemini-pro\` e parser JSON resiliente.
-* **Fix DB:** Ativação de modo WAL para evitar erros de travamento (Database Locked).
-* **Refatoração:** Limpeza total ("Terra Arrasada") e unificação de redes Docker.
-
-### 🚧 Sprint 8: Refinamento e Expansão (Planejada)
-* **Foco:** Usabilidade e Feedback em Tempo Real.
-* **Backlog:**
-    * Feedback no Frontend quando a IA está processando (WebSocket/Polling).
-    * Suporte a múltiplas listas (Mercado vs Farmácia).
-    * Dashboard de gastos (Analytics básico).
+### 7.4 Notificações por E-mail
+- Disparadas quando:
+  - Tarefa com prioridade **Alta** é criada
+  - Responsável: Thiago, Debora ou ambos (Casal)
 
 ---
 
-## 7. Procedimentos de Manutenção
+## 8. Estratégia de Desenvolvimento (Roadmap)
 
-### Atualizar Aplicação
-\`\`\`bash
-cd /opt/n8n-traefik
-docker compose up -d --build familyos-app
-\`\`\`
+### Fase 1 — Fundação
+- Criar tabelas `tasks`, `weather_cache`, `inspiration_cache`
+- Implementar endpoints de tarefas e dashboard
 
-### Debugar Erros (Logs em Tempo Real)
-\`\`\`bash
-docker logs -f familyos_app
-\`\`\`
+### Fase 2 — Inteligência
+- Configurar n8n para roteamento de intenção
+- Ajustar prompt do Gemini para extrair responsável e prioridade
 
-### Resetar Banco de Dados (Zerar Tudo)
-\`\`\`bash
-docker exec familyos_app python src/reset_db.py
-\`\`\`
+### Fase 3 — Frontend
+- Criar `home.html` (Dashboard)
+- Criar `tasks.html` (Quadro de tarefas)
+- Mover lista de compras para `shopping.html`
+
+### Fase 4 — Notificações
+- Configurar SMTP para envio de e-mails
+- Implementar disparo automático para tarefas de alta prioridade
 
 ---
 
-## 8. Estrutura de Arquivos e Deploy
+## 9. Design System (Cyberpunk Dark Neon)
 
-Esta seção descreve como os arquivos do seu ambiente de desenvolvimento (VS Code / Windows) devem ser organizados para garantir um deploy suave para a produção (VPS / Docker).
+### Cores Principais
+| Variável | Cor | Uso |
+|----------|-----|-----|
+| `--bg` | `#050509` | Fundo principal |
+| `--glass` | `rgba(66,79,105,0.25)` | Efeito vidro |
+| `--neon-p` | `#611af0` | Roxo (destaque) |
+| `--neon-g` | `#22ff7a` | Verde (sucesso) |
+| `--neon-r` | `#ff3131` | Vermelho (urgente) |
 
-### 8.1. Estrutura do Projeto (VS Code)
-Esta é a árvore de arquivos que você deve manter no seu computador local (\`C:\\Users\\thiag\\langchain\\projects\\todo_market_list\`).
+### Cores de Prioridade (Tarefas)
+| Nível | Cor | Hex |
+|-------|-----|-----|
+| Baixa | Verde | `#22ff7a` |
+| Média | Dourado | `#ffb800` |
+| Alta | Vermelho | `#ff3131` |
 
-\`\`\`text
-todo_market_list/
-├── .env                # Variáveis locais (NÃO COMMITAR)
-├── .gitignore          # Ignora .env, __pycache__, data/
-├── README.md           # Documentação Geral
-├── requirements.txt    # Bibliotecas Python
-├── deploy_pack/        # Pasta usada para enviar arquivos para a VPS (opcional)
-├── data/               # Banco de Dados Local (SQLite)
-├── docs/               # Documentação Técnica
+---
+
+## 10. Estrutura de Arquivos
+
+```
+familyos/
+├── src/
+│   ├── app.py
+│   ├── templates/
+│   │   ├── home.html       # Dashboard
+│   │   ├── shopping.html   # Lista de compras
+│   │   ├── tasks.html      # Quadro de tarefas
+│   │   └── login.html
+│   └── static/css/styles.css
+├── docs/
 │   ├── api_docs.md
-│   ├── env_setup_docker.md
 │   ├── frontend_docs.md
+│   ├── env_setup_docker.md
 │   └── project_specs.md
-└── src/                # Código Fonte da Aplicação
-    ├── app.py          # O "Cérebro" (Backend Flask)
-    ├── reset_db.py     # Script para zerar/popular o banco
-    ├── static/
-    │   └── css/
-    │       └── styles.css  # Estilos (Tema Cyberpunk)
-    └── templates/
-        ├── index.html  # Frontend (Lista)
-        └── login.html  # Frontend (Login)
-\`\`\`
+└── data/
+    └── familyos.db
+```
 
-### 8.2. Mapeamento para Produção (VPS)
-Quando subimos para a VPS, a estrutura muda ligeiramente pois o Docker assume o controle.
+---
 
-| Arquivo Local (Windows) | Caminho na VPS (Linux) | Caminho DENTRO do Container |
-| :--- | :--- | :--- |
-| \`src/*\` | \`/opt/n8n-traefik/familyos/src/*\` | \`/app/src/*\` |
-| \`requirements.txt\` | \`/opt/n8n-traefik/familyos/requirements.txt\` | \`/app/requirements.txt\` |
-| \`Dockerfile\` | \`/opt/n8n-traefik/familyos/Dockerfile\` | N/A (Usado no build) |
-| \`data/familyos.db\` | \`/opt/n8n-traefik/familyos/data/familyos.db\` | \`/app/data/familyos.db\` |
-| \`.env\` | \`/opt/n8n-traefik/.env\` | Variáveis de Ambiente |
-
-### 8.3. Fluxo de Trabalho (Workflow)
-1.  **Codar:** Faça as alterações no VS Code (pasta \`src\`).
-2.  **Testar:** Rode localmente (`python src/app.py`) para validar.
-3.  **Commitar:** Use o Git para salvar a versão.
-4.  **Deploy:**
-    * Copie a pasta \`src\` e o arquivo \`requirements.txt\` para a VPS (via SSH).
-    * Na VPS, rode: \`docker compose up -d --build familyos-app\`.
+**Autor:** Thiago Scutari  
+**Visão:** Transformar a casa em uma empresa autogerenciável.

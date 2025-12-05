@@ -91,17 +91,30 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     box-shadow: 0 0 10px var(--neon-g);
 }
 
-.btn-clear {
+.btn-clear-large {
     width: 100%;
-    background: rgba(255, 49, 49, 0.15);
+    background: rgba(255, 49, 49, 0.15); /* Fundo vermelho translúcido */
+    backdrop-filter: blur(8px);
     color: var(--neon-r);
-    padding: 16px;
-    border: 1px solid var(--neon-r);
-    border-radius: 50px;
+    font-size: 1rem;
     font-weight: 700;
     text-transform: uppercase;
-    margin-top: 20px;
+    letter-spacing: 1px;
+    padding: 16px;
+    border: 1px solid var(--neon-r);
+    border-radius: 50px; /* Pílula */
+    box-shadow: 0 0 15px rgba(255, 49, 49, 0.2); /* <--- O BRILHO ESTÁ AQUI */
     cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-clear-large:active {
+    transform: scale(0.98);
+    box-shadow: 0 0 25px rgba(255, 49, 49, 0.6); /* Brilha mais ao clicar */
 }
 
 /* Modal */
@@ -134,4 +147,57 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
 .btn-save {
     width: 100%; padding: 14px; background: var(--neon-g);
     border: none; border-radius: 8px; font-weight: 800; color: #000; cursor: pointer;
+}
+/* --- NOVO: BARRA DE NAVEGAÇÃO INFERIOR --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(5, 5, 9, 0.95); /* Quase preto opaco */
+    backdrop-filter: blur(15px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 12px 0 25px 0; /* Padding extra embaixo para iOS */
+    z-index: 2000;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    transition: all 0.3s ease;
+    width: 60px;
+}
+
+.nav-item i {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+    transition: transform 0.2s;
+}
+
+.nav-item.active {
+    color: var(--neon-p); /* Roxo Neon */
+}
+
+.nav-item.active i {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 0 8px rgba(97, 26, 240, 0.5));
+}
+
+/* --- NOVO: WIDGET DE CLIMA NO HEADER --- */
+.weather-widget {
+    font-size: 0.9rem;
+    margin-right: 15px;
+    color: var(--neon-g); /* Verde Neon */
+    font-weight: 600;
+    background: rgba(34, 255, 122, 0.1);
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(34, 255, 122, 0.2);
 }

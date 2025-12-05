@@ -26,3 +26,13 @@ backup/
 /tests
 .tests/
 tests/
+
+__pycache__/
+*.pyc
+.env
+venv/
+.vscode/
+# Ignorar dados do Banco Local
+postgres_data_local/
+postgres_data/
+familyos/data/

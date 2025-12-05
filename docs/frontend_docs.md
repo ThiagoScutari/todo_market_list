@@ -70,3 +70,86 @@ O HTML é gerado dinamicamente pelo Python (Flask).
 * **Categorias:** O loop \`{% for cat, itens in categorias.items() %}\` cria as seções.
 * **Toggle de Seção:** Clicar no título da categoria esconde/mostra a lista (\`display: none/block\`).
 * **Estado Inicial:** Se a lista vier vazia do backend, exibe um ícone de cesta (\`.empty-state\`).
+
+---
+
+**Versão:** 2.0 (The Home OS) - NOVO
+**Stack:** HTML5, Jinja2, CSS3 (Vanilla), JavaScript (Vanilla ES6)
+**Design System:** Cyberpunk Dark Neon
+
+---
+
+## 5. Estrutura de Navegação (Sitemap)
+
+A aplicação deixa de ser uma página única e passa a ter múltiplas views.
+
+* **\`/\` (Dashboard):** Tela inicial. Visão geral, Clima, Mensagem e Menu.
+* **\`/shopping\`:** A Lista de Compras clássica (Funcionalidade v1.2).
+* **\`/tasks\`:** O Quadro de Tarefas Domésticas.
+
+---
+
+## 6. Design System Atualizado
+
+### Cores de Prioridade (Tarefas)
+| Nível | Cor | Hex | Uso |
+| :--- | :--- | :--- | :--- |
+| **Baixa** | Verde Neon | \`#22ff7a\` | Tarefas rotineiras, sem prazo. |
+| **Média** | Dourado | \`#ffb800\` | Importante, fazer na semana. |
+| **Alta** | Vermelho Neon | \`#ff3131\` | **URGENTE**. Dispara e-mail/alerta. |
+
+---
+
+## 7. Especificação das Telas
+
+### 7.1. Dashboard (A Nova Home)
+O objetivo é fornecer informações úteis em < 3 segundos ("Glanceability").
+
+**Layout (Mobile Column):**
+1.  **Header:** Saudação ("Bom dia, Thiago") + Ícone de Clima Atual + Temp.
+2.  **Widget "Inspiração":** Card com citação do dia (fundo vidro fosco).
+3.  **Widget "Estratégia do Tempo":**
+    * Resumo visual de Hoje (Manhã/Tarde/Noite).
+    * Resumo do Fim de Semana (Sol/Chuva) para planejamento de lazer.
+4.  **Grid de Módulos (Botões Grandes):**
+    * [🛒 Compras] (Badge: Qtd itens pendentes).
+    * [✅ Tarefas] (Badge: Qtd pendentes alta prioridade).
+    * [🥗 Ingredientes] (Opacidade 0.5 - "Em Breve").
+    * [⏰ Lembretes] (Opacidade 0.5 - "Em Breve").
+
+### 7.2. Módulo de Compras (Shopping List)
+*Mantém exatamente a mesma UX da versão 1.2.*
+* Categorização automática.
+* Checkbox com vibração.
+* Edição via Long Press.
+
+### 7.3. Módulo de Tarefas (Task Board)
+A visualização é focada em **Responsabilidade**.
+
+**Agrupamento (Accordions):**
+1.  **👤 Thiago** (Tarefas atribuídas a você).
+2.  **👤 Débora** (Tarefas dela).
+3.  **👥 Casal** (Coisas que ambos precisam resolver ou decidir).
+
+**Componente "Task Card":**
+* **Esquerda:** Checkbox circular.
+* **Centro:** Texto da tarefa.
+* **Direita:** "Dot" (Bolinha) colorida indicando a prioridade (Verde/Amarelo/Vermelho).
+
+**Interações:**
+* **Click:** Conclui a tarefa (Riscado + Som/Vibração).
+* **Long Press:** Abre Modal de Edição de Tarefa.
+    * Alterar Responsável (Dropdown: Thiago, Débora, Casal).
+    * Alterar Prioridade (Radio: Baixa, Média, Alta).
+
+---
+
+## 8. Lógica JavaScript (Frontend)
+
+### 8.1. Feedback Otimista (Optimistic UI)
+Igual ao módulo de compras: ao marcar uma tarefa, o DOM é atualizado instantaneamente. A requisição de fundo (\`fetch\`) sincroniza com o servidor. Se der erro, a UI reverte.
+
+### 8.2. Polling de Status (Dashboard)
+Para o Dashboard não ficar estático:
+* **Clima:** Atualiza a cada 30min (via API do backend).
+* **Badges:** Atualiza contagem de itens a cada vez que a tela ganha foco (\`window.onfocus\`).
