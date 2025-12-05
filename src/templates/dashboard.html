@@ -1,8 +1,72 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - FamilyOS{% endblock %}
+
 {% block content %}
-    <div style="text-align:center; padding-top:50px;">
-        <h2>🏠 Dashboard</h2>
-        <p style="color:var(--text-secondary)">Em construção...</p>
+<div class="dashboard-wrapper" style="padding-bottom: 100px;">
+    
+    <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+            <h2 style="margin: 0; font-size: 1.8rem; font-weight: 800;">Olá, {{ current_user.username.title() }}</h2>
+            <p style="margin: 5px 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">{{ clima.desc }} em {{ clima.city }}</p>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 2.5rem; font-weight: 700; line-height: 1; color: var(--neon-g);">{{ clima.temp }}°</div>
+        </div>
     </div>
+
+    <div class="quote-card" style="background: var(--glass); padding: 20px; border-radius: 16px; margin-top: 25px; border-left: 4px solid var(--neon-p);">
+        <p style="font-style: italic; font-size: 1.1rem; line-height: 1.5; margin: 0;">"{{ mensagem }}"</p>
+    </div>
+
+    {% if forecast %}
+    <div style="display: flex; gap: 10px; margin-top: 20px; overflow-x: auto; padding-bottom: 5px;">
+        {% for day in forecast %}
+        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; min-width: 80px; text-align: center;">
+            <div style="font-weight: bold; font-size: 0.8rem; color: var(--text-secondary);">{{ day.weekday }}</div>
+            <div style="font-size: 1.2rem; margin: 5px 0;">
+                {% if 'chuva' in day.description.lower() %}🌧️{% elif 'sol' in day.description.lower() %}☀️{% else %}☁️{% endif %}
+            </div>
+            <div style="font-size: 0.9rem; font-weight: bold;">{{ day.max }}°</div>
+            <div style="font-size: 0.7rem; opacity: 0.6;">{{ day.min }}°</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 style="margin-top: 30px; text-transform: uppercase; font-size: 0.9rem; color: var(--text-secondary); letter-spacing: 1px;">Acesso Rápido</h3>
+    
+    <div class="module-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+        
+        <a href="/shopping" style="text-decoration: none; color: white;">
+            <div class="module-card" style="background: linear-gradient(135deg, rgba(97,26,240,0.2), rgba(97,26,240,0.05)); padding: 20px; border-radius: 20px; border: 1px solid rgba(97,26,240,0.3); position: relative;">
+                {% if qtd_compras > 0 %}
+                <div style="position: absolute; top: 10px; right: 10px; background: var(--neon-r); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">{{ qtd_compras }}</div>
+                {% endif %}
+                <i class="bi bi-cart3" style="font-size: 2rem; color: var(--neon-p);"></i>
+                <div style="margin-top: 10px; font-weight: 700;">Mercado</div>
+            </div>
+        </a>
+
+        <a href="/tasks" style="text-decoration: none; color: white;">
+            <div class="module-card" style="background: linear-gradient(135deg, rgba(34,255,122,0.15), rgba(34,255,122,0.05)); padding: 20px; border-radius: 20px; border: 1px solid rgba(34,255,122,0.3); position: relative;">
+                {% if qtd_tarefas > 0 %}
+                <div style="position: absolute; top: 10px; right: 10px; background: var(--neon-r); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">{{ qtd_tarefas }}</div>
+                {% endif %}
+                <i class="bi bi-check-square" style="font-size: 2rem; color: var(--neon-g);"></i>
+                <div style="margin-top: 10px; font-weight: 700;">Tarefas</div>
+            </div>
+        </a>
+
+        <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); opacity: 0.5;">
+            <i class="bi bi-basket2" style="font-size: 2rem;"></i>
+            <div style="margin-top: 10px; font-weight: 600;">Ingredientes</div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); opacity: 0.5;">
+            <i class="bi bi-alarm" style="font-size: 2rem;"></i>
+            <div style="margin-top: 10px; font-weight: 600;">Lembretes</div>
+        </div>
+
+    </div>
+</div>
 {% endblock %}

@@ -5,6 +5,7 @@ import datetime
 import logging
 import traceback
 import requests
+import random
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -119,6 +120,66 @@ class WeatherCache(db.Model):
     data_json = db.Column(db.Text) # JSON string da API externa
     last_updated = db.Column(db.DateTime)
 
+# --- FUNÇÕES AUXILIARES (HELPER FUNCTIONS) ---
+
+def get_weather_data():
+    """
+    Busca dados de clima com Cache no Banco de Dados (TTL 60 min).
+    """
+    cidade = "Itajai,SC" # Ajuste se necessário
+    agora = datetime.datetime.utcnow()
+    
+    # 1. Tenta buscar no Cache
+    cache = WeatherCache.query.first()
+    
+    # Verifica se o cache é válido (menos de 60 minutos)
+    if cache and cache.last_updated and (agora - cache.last_updated).total_seconds() < 3600:
+        logger.info("Usando Clima do Cache Local")
+        try:
+            return json.loads(cache.data_json)
+        except:
+            pass # Se der erro no JSON, busca de novo
+
+    # 2. Se não tiver cache ou expirou, busca na API
+    logger.info("Buscando Clima na API HG Brasil...")
+    chave = os.getenv('HGBRASIL_KEY')
+    if not chave:
+        return None # Sem chave configurada
+
+    try:
+        url = f"https://api.hgbrasil.com/weather?key={chave}&city_name={cidade}"
+        response = requests.get(url)
+        dados = response.json()
+        
+        # Salva no Banco
+        if not cache:
+            cache = WeatherCache(city=cidade)
+            db.session.add(cache)
+        
+        cache.data_json = json.dumps(dados)
+        cache.last_updated = agora
+        db.session.commit()
+        
+        return dados
+    except Exception as e:
+        logger.error(f"Erro API Clima: {e}")
+        return None
+
+def get_daily_quote():
+    """Retorna uma frase inspiracional aleatória."""
+    frases = [
+        "O sucesso é a soma de pequenos esforços repetidos dia após dia.",
+        "A organização é a chave para a liberdade.",
+        "Não deixe para amanhã o que você pode automatizar hoje.",
+        "Sua casa, suas regras, seu sistema.",
+        "A disciplina é a ponte entre metas e realizações.",
+        "Simplifique. Foque no que importa.",
+        "Toda grande caminhada começa com um simples passo.",
+        "Fé na vida, fé no homem, fé no que virá."
+    ]
+    return random.choice(frases)
+    
+
 @login_manager.user_loader
 def load_user(user_id): return db.session.get(User, int(user_id))
 
@@ -144,19 +205,37 @@ def logout(): logout_user(); return redirect(url_for('login'))
 @app.route('/')
 @login_required
 def dashboard():
-    # Calcula contadores para os Badges
+    # 1. Contadores (Badges)
     qtd_compras = ListaItem.query.filter_by(status='pendente').count()
     qtd_tarefas = Task.query.filter_by(status='pendente').count()
     
-    # Placeholder para Clima e Mensagem (Implementaremos a lógica real na proxima etapa)
-    clima = {"temp": 28, "icon": "bi-cloud-sun"} 
-    mensagem = "O sucesso começa com a organização."
+    # 2. Clima Real
+    weather_data = get_weather_data()
+    clima = {"temp": "--", "desc": "Indisponível", "img_id": "32"} # Default
+    
+    forecast = [] # Para o fim de semana
+    
+    if weather_data and 'results' in weather_data:
+        res = weather_data['results']
+        clima = {
+            "temp": res.get('temp'),
+            "desc": res.get('description'),
+            "img_id": res.get('img_id'), # HG Brasil usa IDs para ícones
+            "city": res.get('city'),
+            "time": res.get('time')
+        }
+        # Pega previsão dos próximos dias (para mostrar fim de semana)
+        forecast = res.get('forecast', [])[:3] # Pega hoje + 2 dias
+
+    # 3. Mensagem do Dia
+    mensagem = get_daily_quote()
 
     return render_template('dashboard.html', 
                            active_page='dashboard',
                            qtd_compras=qtd_compras,
                            qtd_tarefas=qtd_tarefas,
                            clima=clima,
+                           forecast=forecast,
                            mensagem=mensagem)
 
 @app.route('/shopping')
@@ -409,6 +488,23 @@ def tasks_magic():
         logger.error(f"ERRO TASK: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
+
+@app.route('/tasks/update', methods=['POST'])
+@login_required
+def update_task():
+    d = request.get_json()
+    task_id = int(d.get('id'))
+    
+    task = db.session.get(Task, task_id)
+    if not task:
+        return jsonify({'error': 'Tarefa não encontrada'}), 404
+    
+    task.descricao = d.get('descricao')
+    task.responsavel = d.get('responsavel')
+    task.prioridade = int(d.get('prioridade'))
+    
+    db.session.commit()
+    return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()

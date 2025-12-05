@@ -58,16 +58,16 @@
     {% endif %}
 
     <div id="editModal" class="modal-overlay">
-        <div class="modal-content-glass">
-            <h3 style="margin-top:0; text-align:center;">EDITAR ITEM</h3>
+        <div class="modal-box">
+            <h3>EDITAR ITEM</h3>
             <form id="editForm">
                 <input type="hidden" id="eid">
                 
-                <label>Nome</label>
+                <label>Nome do Produto</label>
                 <input type="text" id="enome" autocomplete="off">
                 
                 <label>Categoria</label>
-                <input type="text" id="ecat" list="catList" autocomplete="off" placeholder="Selecione ou digite..."
+                <input type="text" id="ecat" list="catList" autocomplete="off" placeholder="Selecione..."
                        onmousedown="if(this.value === ''){this.value=' ';this.value='';}"
                        onclick="this.focus();">
                 
@@ -77,10 +77,8 @@
                     {% endfor %}
                 </datalist>
 
-                <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button type="button" class="btn-glass-cancel" style="flex:1; background:transparent; border:1px solid #555; color:#aaa; padding:12px; border-radius:8px;" onclick="document.getElementById('editModal').classList.remove('visible')">Cancelar</button>
-                    <button type="submit" class="btn-glass-save" style="flex:1;">SALVAR</button>
-                </div>
+                <button type="submit" class="btn-save">SALVAR</button>
+                <button type="button" class="btn-cancel" onclick="document.getElementById('editModal').classList.remove('visible')">Cancelar</button>
             </form>
         </div>
     </div>

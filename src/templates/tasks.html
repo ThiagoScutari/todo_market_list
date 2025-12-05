@@ -70,7 +70,36 @@
     </button>
     <div style="height: 80px;"></div>
     
-{% endblock %}
+    <div id="editTaskModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>EDITAR TAREFA</h3>
+            <form id="editTaskForm">
+                <input type="hidden" id="tid">
+                
+                <label>O que fazer?</label>
+                <input type="text" id="tdesc" required autocomplete="off">
+                
+                <label>Responsável pela tarefa?</label>
+                <select id="tresp">
+                    <option value="Thiago">Thiago</option>
+                    <option value="Debora">Debora</option>
+                    <option value="Casal">Casal</option>
+                </select>
+
+                <label>Prioridade</label>
+                <select id="tprio">
+                    <option value="1">🟢 Baixa (Normal)</option>
+                    <option value="2">🟡 Média (Importante)</option>
+                    <option value="3">🔴 Alta (Urgente)</option>
+                </select>
+
+                <button type="submit" class="btn-save">SALVAR</button>
+                <button type="button" class="btn-cancel" onclick="document.getElementById('editTaskModal').classList.remove('visible')">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    {% endblock %}
 
 {% block extra_js %}
 <script>
@@ -99,5 +128,78 @@
             fetch('/clear_tasks', { method: 'POST' }).then(() => location.reload());
         }
     }
+
+
+// ... (código existente de toggle e clear) ...
+
+    // LOGICA DE LONG PRESS (EDITAR)
+    let pressTimer;
+    const cards = document.querySelectorAll('.product-card');
+
+    cards.forEach(card => {
+        const start = (e) => {
+            if (e.target.closest('.checkbox-wrapper')) return; // Ignora clique no check
+            pressTimer = setTimeout(() => {
+                openTaskModal(card);
+                if (navigator.vibrate) navigator.vibrate(100);
+            }, 800);
+        };
+        const end = () => clearTimeout(pressTimer);
+
+        card.addEventListener('mousedown', start);
+        card.addEventListener('touchstart', start, {passive: true});
+        card.addEventListener('mouseup', end);
+        card.addEventListener('touchend', end);
+        card.addEventListener('touchmove', end);
+    });
+    function openTaskModal(card) {
+        const id = card.id.replace('task-', '');
+        
+        // 1. Pega a descrição (texto da tarefa)
+        // O seletor .product-name pega o texto, mas precisamos limpar espaços extras
+        const descricaoElement = card.querySelector('.product-name');
+        const descricao = descricaoElement.innerText.trim();
+
+        // 2. Tenta descobrir quem é o responsável atual para pré-selecionar no modal
+        // Buscamos a section pai para ver em qual accordion a tarefa está
+        const section = card.closest('.category-section');
+        const headerText = section.querySelector('.category-header span').innerText;
+        
+        let responsavelAtual = "Thiago"; // Default
+        if (headerText.includes("Debora")) responsavelAtual = "Debora";
+        if (headerText.includes("Casal")) responsavelAtual = "Casal";
+
+        // 3. Preenche o formulário
+        document.getElementById('tid').value = id;
+        document.getElementById('tdesc').value = descricao;
+        document.getElementById('tresp').value = responsavelAtual;
+        
+        // Tenta adivinhar a prioridade pela cor da bolinha (opcional, ou deixa padrão 1)
+        // (Se quiser implementar depois, precisaria salvar data-priority no card)
+        
+        // Abre o modal
+        document.getElementById('editTaskModal').classList.add('visible');
+    };
+    // SALVAR EDIÇÃO
+    document.getElementById('editTaskForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('.btn-save');
+        btn.innerText = "Salvando...";
+
+        const data = {
+            id: document.getElementById('tid').value,
+            descricao: document.getElementById('tdesc').value,
+            responsavel: document.getElementById('tresp').value,
+            prioridade: document.getElementById('tprio').value
+        };
+
+        await fetch('/tasks/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        location.reload();
+    };
 </script>
 {% endblock %}

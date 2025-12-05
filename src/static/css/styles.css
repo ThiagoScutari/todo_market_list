@@ -117,36 +117,140 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     box-shadow: 0 0 25px rgba(255, 49, 49, 0.6); /* Brilha mais ao clicar */
 }
 
-/* Modal */
+/* --- MODAL CYBERPUNK (PADRÃO GLOBAL) --- */
 .modal-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(8px);
-    display: flex; justify-content: center; align-items: center;
-    opacity: 0; pointer-events: none; transition: 0.3s; z-index: 9999;
-}
-.modal-overlay.visible { opacity: 1; pointer-events: auto; }
-.modal-box {
-    background: #181820;
-    padding: 2rem;
-    border-radius: 16px;
-    border: 1px solid var(--neon-p);
-    width: 90%; max-width: 400px;
-    box-shadow: 0 0 30px rgba(97, 26, 240, 0.3);
-}
-.modal-box input {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    margin: 8px 0 20px;
-    box-sizing: border-box;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85); /* Fundo bem escuro */
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
 }
+
+.modal-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-box {
+    background: #121216; /* Quase preto */
+    border: 1px solid var(--neon-p); /* Borda Roxa */
+    box-shadow: 0 0 25px rgba(97, 26, 240, 0.25); /* Glow Roxo */
+    padding: 24px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 350px;
+    color: white;
+}
+
+.modal-box h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+.modal-box label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+/* --- REFINAMENTO DOS CAMPOS (INPUTS E SELECTS) --- */
+
+/* 1. Regra Geral para Todos os Campos do Modal */
+.modal-box input,
+.modal-box select {
+    width: 100%;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    
+    /* Perfeccionismo: Mais arredondado e com sombra */
+    border-radius: 12px; 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); 
+    
+    padding: 12px;
+    font-size: 1rem;
+    margin-bottom: 20px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+/* 2. Efeito de Foco (Brilho Roxo) */
+.modal-box input:focus,
+.modal-box select:focus {
+    border-color: var(--neon-p);
+    box-shadow: 0 0 15px rgba(97, 26, 240, 0.3); /* Glow Roxo */
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 3. CORREÇÃO: Remover seta forçada dos Inputs de Texto (Nome, Descrição) */
+.modal-box input {
+    background-image: none !important; /* Garante que não tenha ícone */
+    -webkit-appearance: none; /* Remove estilos nativos do browser */
+}
+
+/* 4. Estilo Exclusivo dos SELECTS (Com a Seta Personalizada) */
+.modal-box select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    
+    /* Seta Branca Minimalista */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px; /* Espaço para o ícone não ficar em cima do texto */
+}
+
+/* 5. Estilo das Opções (Dropdown aberto) */
+/* Nota: Browsers limitam muito o estilo aqui, mas garantimos o fundo escuro */
+.modal-box select option {
+    background-color: #181820; /* Fundo Cyberpunk Escuro */
+    color: white;
+    padding: 12px;
+}
+
+/* Botão Salvar (Verde Neon) */
 .btn-save {
-    width: 100%; padding: 14px; background: var(--neon-g);
-    border: none; border-radius: 8px; font-weight: 800; color: #000; cursor: pointer;
+    width: 100%;
+    padding: 14px;
+    background: var(--neon-g);
+    color: #000; /* Texto preto para contraste */
+    border: none;
+    border-radius: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 0 15px rgba(34, 255, 122, 0.4);
+}
+
+.btn-cancel {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 15px;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.9rem;
 }
 /* --- NOVO: BARRA DE NAVEGAÇÃO INFERIOR --- */
 .bottom-nav {
