@@ -1,139 +1,165 @@
-# 🛒 FamilyOS: ToDo Market & List
+### 📄 Atualização do `README.md`
+
+**Onde rodar:** Na raiz do projeto no seu VS Code. Substitua o conteúdo atual por este.
+
+````markdown
+# 🏡 FamilyOS v2.0: The Home Operating System
 ### Software House Autônoma de Gestão Doméstica
 
-O **FamilyOS** é um sistema híbrido de gestão doméstica inteligente, focado em eliminar a **fricção cognitiva e operacional** na organização familiar. O foco atual é o Módulo de Compras, que utiliza Inteligência Artificial para transformar áudios no Telegram em uma **Lista de Compras Web Interativa**.
+O **FamilyOS** é um ecossistema de gestão doméstica "Zero UI". Ele elimina a fricção cognitiva de aplicativos tradicionais, permitindo que a família gerencie **Compras** e **Tarefas** usando apenas linguagem natural (áudio ou texto) no Telegram, enquanto uma Inteligência Artificial organiza tudo em um Dashboard Web Mobile-First.
 
-> **Versão Atual:** 1.2 (Stable Persistence)
-> **Stack:** Python Flask, Docker, SQLite (WAL), Google Gemini Pro.
-> **Status:** ✅ Produção
+> **Status:** ✅ Produção (Estável)
+> **Versão:** 2.1 (Multi-Module)
+> **Stack:** Python Flask, Docker, PostgreSQL, n8n, Google Gemini Pro.
 
 ---
 
-## 💡 Showcase: O Fluxo de Uso
+## 🧠 O Conceito "Zero UI"
 
-### 1. Entrada de Dados "Zero UI" (Telegram)
-A interface de entrada é o Telegram. O sistema aceita áudios com linguagem natural ("preciso de 3 ovos e uma caixa de leite") ou texto direto. O bot confirma o recebimento e avisa se o item foi adicionado ou se já existia na lista.
+O sistema entende a intenção do usuário sem botões ou menus complexos.
+
+### 1. Entrada de Dados (Telegram)
+Você fala como se estivesse pedindo um favor a um assistente real.
+* *"Comprar leite e pão"* -> Vai para o **Mercado**.
+* *"Thiago precisa lavar o carro urgente"* -> Vai para **Tarefas** (Atribuído a Thiago, Alta Prioridade).
+* *"Temos que ir ao cinema"* -> Vai para **Tarefas** (Atribuído ao Casal, Média Prioridade).
 
 ![Interação Telegram](images/telegram.jpg)
 
-### 2. O Cérebro (Orquestração n8n)
-O **n8n** atua como o sistema nervoso, recebendo o webhook do Telegram, processando o áudio via Whisper e enviando para a API Python estruturar os dados com a IA do Google.
+### 2. O Cérebro (Roteamento n8n + IA)
+O **n8n** atua como o córtex frontal. Ele recebe o áudio, transcreve (Whisper) e usa um **Classificador de Intenção** (LLM) para decidir se aquilo é uma compra ou uma tarefa, encaminhando para a rota correta da API.
 
 ![Fluxo n8n](images/n8n.png)
 
-### 3. Segurança (Acesso Familiar)
-O sistema conta com uma camada de autenticação via Cookies de Sessão para garantir que apenas a família tenha acesso à gestão.
+---
 
-![Tela de Login](images/login.jpg)
+## 📱 Módulos do Sistema
 
-### 4. A Lista Inteligente (Web App Mobile-First)
-Uma interface limpa com design **Cyberpunk Dark Neon**. O sistema agrupa automaticamente os itens por categorias (Padaria, Laticínios, Higiene) para otimizar o trajeto dentro do supermercado.
+O Frontend foi desenhado com o tema **Cyberpunk Dark Neon**, focado em uso noturno e alto contraste.
 
-![Interface Principal](images/item_list.jpg)
+### 🛒 Módulo 1: Mercado (Shopping List)
+Otimizado para o momento da compra. Os itens são categorizados automaticamente pela IA (Padaria, Açougue, Higiene) para facilitar o trajeto no supermercado.
+
+![Lista de Mercado](images/item_list.jpg)
+
+### ✅ Módulo 2: Gestão de Tarefas (Task Board) [NOVO]
+Um quadro de gestão de vida. A IA define automaticamente:
+1.  **Responsável:** Thiago, Débora ou Casal (baseado no contexto da frase).
+2.  **Prioridade:** 🔴 Alta (Urgente), 🟡 Média (Importante), 🟢 Baixa (Rotina).
+
+![Lista de Tarefas](images/tasks.jpg)
 
 ---
 
-## ✨ Detalhes da Experiência (UX)
+## ✨ Experiência do Usuário (UX)
 
-O FamilyOS foi desenhado para ser usado com uma mão só enquanto se empurra um carrinho de mercado.
-
-### Feedback Visual Instantâneo
-Ao marcar um item, ele recebe um feedback visual imediato (check verde neon e vibração tátil). A sincronização com o servidor acontece em segundo plano (Optimistic UI).
+### Feedback Visual e Tátil
+Ao concluir um item, o feedback é instantâneo (Optimistic UI). O item brilha em verde neon e o celular vibra, gerando satisfação dopaminérgica.
 
 ![Checkbox Ativo](images/checkbox.jpg)
 
-### Edição Rápida (Long Press)
-Errou o nome ou a categoria? Não precisa apagar. Segure o dedo sobre o item por **800ms** para abrir o Modal de Edição. O campo de categoria possui *autocomplete* inteligente.
+### Edição Poderosa (Long Press)
+Errou algo? Segure o dedo por 800ms sobre qualquer item para abrir o Modal de Edição. O sistema possui *autocomplete* inteligente para categorias.
 
 ![Modal de Edição](images/modal_longpress.jpg)
 
-### Limpeza de Carrinho (Soft Delete)
-Ao finalizar as compras, o botão "Limpar Carrinho" arquiva os itens comprados, mantendo-os no banco de dados para histórico futuro, mas limpando a visualização principal.
+### Arquivamento (Soft Delete)
+Mantenha a lista limpa. O botão de arquivar remove os itens concluídos da visão principal, mas mantém o histórico no banco de dados.
 
 ![Arquivar Itens](images/arquivar_itens.jpg)
 
 ---
 
-## 🏗️ Arquitetura Técnica
+## 🏗️ Arquitetura e Workflow (DevOps)
 
-A arquitetura evoluiu para um **Microserviço Híbrido Resiliente**, hospedado em Docker. A versão 1.2 foca em persistência de dados e estabilidade de IA.
+Este projeto utiliza um ciclo de desenvolvimento profissional híbrido, garantindo estabilidade em produção e agilidade no desenvolvimento.
 
 ![Arquitetura do Sistema](images/arquitetura.png)
 
-### Componentes Chave
-
-| Componente | Função | Tecnologias Chave |
-| :--- | :--- | :--- |
-| **Interface** | Captura de áudio/texto | Telegram Bot API |
-| **Orquestrador** | Transcrição e Roteamento | n8n, OpenAI Whisper |
-| **Inteligência** | Extração e Sanitização | **Google Gemini Pro**, LangChain |
-| **Backend** | Regras de Negócio | Python Flask, Gunicorn, SQLAlchemy |
-| **Persistência** | Banco de Dados Resiliente | **SQLite (WAL Mode)** |
-| **Frontend** | Visualização | HTML5, CSS3 (Glassmorphism), JS Vanilla |
+### 🔄 Ciclo de Vida do Código
+1.  **Desenvolvimento Local (VS Code):**
+    * O código Python roda nativamente no Windows para debug rápido.
+    * O Banco de Dados (Postgres) roda isolado no Docker Desktop.
+    * O **Ngrok** expõe a API local para a internet, permitindo testar o n8n em tempo real.
+2.  **Versionamento (Git):**
+    * Commits padronizados sobem para o GitHub (`main branch`).
+3.  **Produção (VPS HostGator):**
+    * O servidor puxa a versão estável do Git.
+    * O Docker Compose orquestra a atualização dos containers sem downtime perceptível.
 
 ---
 
-## 🛠️ Instalação e Deploy
-
-O projeto utiliza **Docker Compose** para orquestração.
-
-### 1. Configuração de Ambiente (.env)
-Crie um arquivo `.env` na raiz do projeto (ao lado do `docker-compose.yml`) com suas credenciais:
-
-```bash
-TZ=America/Sao_Paulo
-SECRET_KEY=sua_chave_secreta_aqui
-DATABASE_URL=sqlite:////app/data/familyos.db
-GOOGLE_API_KEY=sua_chave_do_google_aqui
-````
-
-### 2\. Subir a Aplicação
-
-```bash
-docker compose up -d --build familyos-app
-```
-
-### 3\. Resetar/Criar Usuários (Primeiro Uso)
-
-Para criar o banco de dados e os usuários padrão (`thiago` / `debora`):
-
-```bash
-docker exec familyos_app python src/reset_db.py
-```
-
------
-
 ## 📂 Estrutura de Arquivos
 
-Para garantir que o deploy funcione, mantenha esta estrutura:
+### 🏠 Ambiente Local (Desenvolvimento)
 
 ```text
-/opt/n8n-traefik/          # Raiz da VPS
-├── .env                   # Variáveis de Ambiente (Segurança)
-├── docker-compose.yml     # Orquestrador
-└── familyos/              # Projeto FamilyOS
+C:\Users\thiag\...\todo_market_list\
+├── .env                   # Segredos Locais (Ngrok URL, DB Local)
+├── .gitignore             # Arquivos ignorados pelo Git
+├── docker-compose.yml     # Sobe apenas o DB Postgres para dev
+├── requirements.txt       # Dependências Python
+├── README.md              # Este arquivo
+├── postgres_data_local/   # Persistência do Banco Local (Ignorado no Git)
+├── docs/                  # Documentação Técnica (API, Specs, Setup)
+├── images/                # Screenshots do README
+├── tests/                 # Scripts de teste e experimentos
+└── src/                   # Código Fonte da Aplicação
+    ├── app.py             # Backend Flask (Rotas /magic e /tasks)
+    ├── main.py            # Ponto de entrada auxiliar
+    ├── reset_db.py        # Script para resetar/criar tabelas
+    ├── ngrok.exe          # Executável do Túnel (Acesso Externo)
+    ├── templates/         # Frontend (Jinja2)
+    │   ├── base.html      # Layout Mestre (Nav + Header)
+    │   ├── dashboard.html # Home (Nova)
+    │   ├── shopping.html  # Módulo Mercado
+    │   ├── tasks.html     # Módulo Tarefas
+    │   ├── login.html     # Tela de Login
+    │   └── index.html     # (Legado)
+    └── static/            # CSS e Assets
+        └── css/
+            └── styles.css
+```
+
+### ☁️ Ambiente de Produção (VPS)
+
+```text
+/opt/n8n-traefik/          # Raiz da Infraestrutura
+├── .env                   # Segredos de Produção
+├── docker-compose.yml     # Orquestrador Completo (App + Banco + N8N + Traefik)
+└── familyos/              # Repositório Clonado
     ├── Dockerfile         # Receita da Imagem
-    ├── data/              # Banco de Dados (Persistente)
-    └── src/               # Código Fonte
-        ├── app.py         # Backend Flask
-        ├── static/        # CSS/Imagens
-        └── templates/     # HTML (Jinja2)
+    └── src/               # Código Fonte Sincronizado
 ```
 
 -----
 
-## 🗺️ Roadmap e Status
+## 🛠️ Stack Tecnológica
 
-| Sprint | Foco | Status |
+| Camada | Tecnologia | Função |
 | :--- | :--- | :--- |
-| **Sprint 1-6** | MVP e Frontend Básico | ✅ Concluído |
-| **Sprint 7** | **Persistência, WAL Mode e UX Mobile** | ✅ Concluído (v1.2) |
-| **Sprint 8** | Feedback de IA no Frontend (WebSocket) | 🚧 Planejado |
-| **Sprint 9** | Múltiplas Listas (Churrasco/Farmácia) | 🔮 Futuro |
+| **Interface** | Telegram Bot API | Entrada de dados Zero UI |
+| **Orquestração** | n8n (Self-Hosted) | Lógica de Fluxo, Whisper, Roteamento |
+| **Backend** | Python Flask | API REST, Regras de Negócio |
+| **Banco de Dados** | **PostgreSQL 15** | Persistência Relacional Robusta |
+| **Inteligência** | Google Gemini 1.5 | NLP, Classificação e Extração de Entidades |
+| **Infra** | Docker & Traefik | Containerização e Proxy Reverso SSL |
+
+-----
+
+## 🗺️ Roadmap
+
+| Versão | Foco | Status |
+| :--- | :--- | :--- |
+| **v1.0** | MVP Lista de Compras | ✅ Concluído |
+| **v1.2** | Persistência e UX Mobile | ✅ Concluído |
+| **v2.0** | **Módulo Tarefas & Postgres** | ✅ **Produção** |
+| **v2.1** | Dashboard & Clima | 🚧 Em Breve |
+| **v3.0** | Finanças & Orçamento | 🔮 Futuro |
 
 -----
 
 **Desenvolvido por:** Thiago Scutari.
-**Powered by:** Python, Docker & Coffee.
+*Automação Residencial levada a sério.*
 
 ```
