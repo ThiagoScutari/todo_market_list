@@ -42,7 +42,7 @@ Um quadro de gestão de vida. A IA define automaticamente:
 1.  **Responsável:** Thiago, Débora ou Casal (baseado no contexto da frase).
 2.  **Prioridade:** 🔴 Alta (Urgente), 🟡 Média (Importante), 🟢 Baixa (Rotina).
 
-![Lista de Tarefas](images/tasks.jpg)
+![Lista de Tarefas](images/tarefas.jpg)
 
 ---
 
