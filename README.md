@@ -1,8 +1,3 @@
-### 📄 Atualização do `README.md`
-
-**Onde rodar:** Na raiz do projeto no seu VS Code. Substitua o conteúdo atual por este.
-
-````markdown
 # 🏡 FamilyOS v2.0: The Home Operating System
 ### Software House Autônoma de Gestão Doméstica
 
@@ -10,7 +5,7 @@ O **FamilyOS** é um ecossistema de gestão doméstica "Zero UI". Ele elimina a 
 
 > **Status:** ✅ Produção (Estável)
 > **Versão:** 2.1 (Multi-Module)
-> **Stack:** Python Flask, Docker, PostgreSQL, n8n, Google Gemini Pro.
+> **Stack:** Python Flask, Docker, PostgreSQL, n8n, Google Gemini Pro e OpenAI-APIs.
 
 ---
 
