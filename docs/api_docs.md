@@ -1,249 +1,211 @@
 # 📡 FamilyOS API Documentation
-**Versão:** 1.2 (Stable)
-**Base URL:** \`https://api.thiagoscutari.com.br\`
-**Tecnologia:** Python Flask + SQLite + SQLAlchemy
+
+**Versão:** 2.1 (Stable - Multi-Module)
+**Base URL:** `https://api.thiagoscutari.com.br`
+**Tecnologia:** Python Flask, PostgreSQL, SQLAlchemy
+**Data de Atualização:** 05/12/2025
 
 ---
 
 ## 🔐 1. Autenticação e Segurança
 
-### Mecanismo
-O sistema utiliza **Session Cookies** para rotas protegidas.
-* **Login:** Cria um cookie seguro (\`HttpOnly\`, \`Secure\`, \`SameSite=Lax\`).
-* **Duração:** O cookie é persistente por 30 dias (\`REMEMBER_COOKIE_DURATION\`).
-* **Rota Pública:** A única rota de API que não exige login é \`/magic\` (protegida apenas por obscuridade e uso interno via n8n).
+O sistema utiliza um modelo híbrido de segurança dependendo da origem da requisição.
+
+### 1.1. Acesso Web (Frontend)
+Utiliza **Cookies de Sessão** (`session`) gerados pelo Flask-Login.
+* **Cookie Name:** `session`
+* **Propriedades:** `HttpOnly`, `Secure`, `SameSite=Lax`.
+* **Duração:** 30 dias (`REMEMBER_COOKIE_DURATION`).
+* **Proteção:** Todas as rotas (exceto `/magic` e `/login`) possuem o decorador `@login_required`.
+
+### 1.2. Acesso via n8n (Webhooks)
+As rotas de IA (`/magic` e `/tasks/magic`) são públicas para permitir o acesso via webhook do n8n sem complexidade de cookies, porém são protegidas por **obscuridade de rota** (não divulgadas publicamente).
 
 ---
 
-## 🤖 2. Inteligência Artificial (Core)
+## 🤖 2. Endpoints de IA (Core n8n)
 
-### \`POST /magic\`
-Esta é a rota principal utilizada pelo n8n para processar áudios e textos.
+Estes endpoints são chamados exclusivamente pelo orquestrador **n8n** após a transcrição do áudio.
 
-* **Descrição:** Recebe um texto natural, envia para o Google Gemini Pro, processa o JSON retornado, verifica duplicidade no banco de dados e insere os itens.
-* **Auth:** Pública (Não requer header de sessão).
-* **Headers:**
-    * \`Content-Type: application/json\`
+### 2.1. Processar Compras
+**Rota:** `POST /magic`
+**Descrição:** Recebe texto natural, extrai itens via IA, categoriza e insere na lista de compras.
 
-#### Corpo da Requisição (Request Body)
-\`\`\`json
-{
-  "texto": "Comprar 2 kg de picanha e um pacote de carvão",
-  "usuario": "Thiago"
-}
-\`\`\`
-* \`texto\` (Obrigatório): A transcrição do áudio ou texto digitado.
-* \`usuario\` (Opcional): Nome de quem enviou (padrão: "Anônimo").
-
-#### Respostas (Response)
-
-**Sucesso (201 Created):**
-Retorna uma mensagem formatada pronta para ser exibida no Telegram.
-\`\`\`json
-{
-  "message": "✅ Adicionados: Picanha, Carvão"
-}
-\`\`\`
-
-**Sucesso Parcial (201 Created):**
-Quando alguns itens são novos e outros já existiam (status 'pendente' ou 'comprado').
-\`\`\`json
-{
-  "message": "✅ Adicionados: Picanha | ⚠️ Já na lista: Carvão"
-}
-\`\`\`
-
-**Erro de Configuração (503 Service Unavailable):**
-Quando a chave da API do Google falha ou o modelo não é encontrado.
-\`\`\`json
-{
-  "erro": "Config IA Falhou: [Detalhes do erro Python...]"
-}
-\`\`\`
-
----
-
-## 🛒 3. Gestão da Lista (Frontend)
-
-### \`POST /toggle_item/<id>\`
-Marca ou desmarca um item como comprado.
-
-* **Descrição:** Usado pelo checkbox na interface. Alterna o status do item no banco.
-* **Lógica:** Se \`pendente\` -> vira \`comprado\`. Se \`comprado\` -> vira \`pendente\`.
-* **Auth:** Requer Login.
-* **Parâmetros de URL:**
-    * \`id\` (Integer): O ID único do item na tabela \`lista_itens\`.
-
-**Exemplo de Resposta (200 OK):**
-\`\`\`json
-{
-  "status": "success",
-  "novo_status": "comprado"
-}
-\`\`\`
-
----
-
-### \`POST /update_item\`
-Edita as propriedades de um item existente.
-
-* **Descrição:** Usado pelo Modal de Edição (Long Press). Permite corrigir erros de transcrição ou mudar categoria.
-* **Auth:** Requer Login.
-* **Headers:** \`Content-Type: application/json\`
-
-#### Corpo da Requisição
-\`\`\`json
-{
-  "id": 15,
-  "nome": "Pão de Queijo",
-  "categoria": "PADARIA"
-}
-\`\`\`
-* **Lógica de Backend:**
-    * Normaliza o nome para minúsculas ("pão de queijo").
-    * Normaliza a categoria para maiúsculas ("PADARIA").
-    * Se a categoria não existir, cria uma nova.
-    * Se o produto (nome) não existir, cria um novo produto.
-
-**Exemplo de Resposta (200 OK):**
-\`\`\`json
-{
-  "message": "OK"
-}
-\`\`\`
-
----
-
-### \`POST /clear_cart\`
-Limpa o carrinho (Arquivamento).
-
-* **Descrição:** Chamado pelo botão "Limpar Carrinho". Não deleta fisicamente.
-* **Lógica:** Altera o status de todos os itens \`comprado\` para \`finalizado\`. Itens \`finalizado\` não aparecem mais na Home, mas ficam no banco para histórico futuro.
-* **Auth:** Requer Login.
-
-**Exemplo de Resposta (200 OK):**
-\`\`\`json
-{
-  "status": "success"
-}
-\`\`\`
-
----
-
-## 🌐 4. Navegação
-
-### \`GET /\`
-Página Principal.
-* **Retorno:** HTML renderizado (Jinja2) com a lista agrupada por categorias.
-
-### \`GET /login\` e \`POST /login\`
-Página de Acesso.
-* **GET:** Exibe o formulário.
-* **POST:** Processa \`username\` e \`password\`. Redireciona para \`/\` em caso de sucesso.
-
-### \`GET /logout\`
-Encerra a sessão.
-* **Ação:** Limpa o cookie de sessão e redireciona para \`/login\`.
-
----
-
-## ✅ 5. Módulo de Tarefas (Tasks) - [NOVO]
-
-### \`POST /tasks/magic\` (Core IA)
-Recebe texto natural, classifica prioridade e atribui responsável automaticamente.
-
-* **Descrição:** Endpoint chamado pelo n8n após o roteador de intenção identificar que é uma "Tarefa".
-* **Body (JSON):**
-    \`\`\`json
+* **Headers:** `Content-Type: application/json`
+* **Corpo da Requisição (JSON):**
+    ```json
     {
-      "texto": "Thiago colocar roupas para lavar",
-      "remetente": "Thiago"
+      "texto": "Comprar 2 pacotes de café e sabão em pó",
+      "usuario": "Thiago"
     }
-    \`\`\`
-    * *Nota:* O campo \`remetente\` é crucial para a regra de atribuição implícita ("eu vou fazer").
-
-* **Lógica de Atribuição (Backend):**
-    1.  **Explícita:** Se o texto contiver "Thiago", "Debora" ou "Nós/Casal".
-    2.  **Implícita:** Se não tiver nome, atribui ao \`remetente\`.
-    
-* **Sucesso (201 Created):**
-    \`\`\`json
+    ```
+* **Lógica de Negócio:**
+    * **Parsing:** Ignora blocos Markdown (` ```json `) retornados pela IA.
+    * **Deduplicação:** Se o item já existe (`pendente` ou `comprado`), ele é ignorado.
+    * **Categorização:** Automática via Google Gemini.
+* **Resposta Sucesso (201 Created):**
+    ```json
     {
-      "message": "✅ Tarefa atribuída a Thiago: Colocar roupas para lavar (P: Baixa)",
-      "task_id": 42
+      "message": "✅ Adicionados: Café, Sabão em pó"
     }
-    \`\`\`
-
-### \`POST /tasks/toggle/<id>\`
-Conclui ou reabre uma tarefa.
-* **Lógica:** Alterna status entre \`pendente\` <-> \`concluido\`.
-* **Sucesso (200 OK):** \`{"status": "success", "novo_status": "concluido"}\`
-
-### \`POST /tasks/update\`
-Edita uma tarefa existente.
-* **Body (JSON):**
-    \`\`\`json
+    ```
+* **Resposta Parcial (201 Created):**
+    ```json
     {
-      "id": 42,
+      "message": "✅ Adicionados: Café | ⚠️ Já na lista: Sabão em pó"
+    }
+    ```
+
+### 2.2. Processar Tarefas
+**Rota:** `POST /tasks/magic`
+**Descrição:** Recebe texto natural, extrai múltiplas tarefas, define prioridade e atribui responsável.
+
+* **Headers:** `Content-Type: application/json`
+* **Corpo da Requisição (JSON):**
+    ```json
+    {
+      "texto": "Thiago precisa lavar o carro urgente e nós vamos que jantar fora",
+      "remetente": "Débora"
+    }
+    ```
+    * *Nota:* O campo `remetente` é usado para atribuição implícita (se a frase não citar nomes).
+* **Lógica de Atribuição:**
+    * Cita nome ("Thiago", "Debora") -> Atribui direto.
+    * Cita coletivo ("Nós", "Temos") -> Atribui a "Casal".
+    * Sem citação -> Atribui ao `remetente`.
+* **Resposta Sucesso (201 Created):**
+    ```json
+    {
+      "message": "✅ Thiago: 🔴 Lavar o carro\n✅ Casal: 🟡 Jantar fora",
+      "task_id": 45
+    }
+    ```
+
+---
+
+## 🛒 3. Módulo de Mercado (Frontend Actions)
+
+Endpoints utilizados pelo JavaScript (`shopping.html`) para interatividade.
+
+### 3.1. Alternar Status (Check)
+**Rota:** `POST /toggle_item/<id>`
+**Descrição:** Marca ou desmarca um item como comprado.
+* **Parâmetros:** `id` (Integer) - ID do item na tabela `lista_itens`.
+* **Resposta (200 OK):**
+    ```json
+    {
+      "status": "success",
+      "novo_status": "comprado"
+    }
+    ```
+
+### 3.2. Atualizar Item
+**Rota:** `POST /update_item`
+**Descrição:** Edita nome e categoria via Modal.
+* **Corpo (JSON):**
+    ```json
+    {
+      "id": 10,
+      "nome": "Pão Francês",
+      "categoria": "PADARIA"
+    }
+    ```
+* **Resposta (200 OK):** `{"message": "OK"}`
+
+### 3.3. Arquivar Carrinho
+**Rota:** `POST /clear_cart`
+**Descrição:** Altera o status de todos os itens `comprado` para `finalizado` (Soft Delete).
+* **Resposta (200 OK):** `{"status": "success"}`
+
+---
+
+## ✅ 4. Módulo de Tarefas (Frontend Actions)
+
+Endpoints utilizados pelo JavaScript (`tasks.html`).
+
+### 4.1. Concluir Tarefa
+**Rota:** `POST /toggle_task/<id>`
+**Descrição:** Alterna o status entre `pendente` e `concluido`.
+* **Parâmetros:** `id` (Integer) - ID na tabela `tasks`.
+* **Resposta (200 OK):**
+    ```json
+    {
+      "status": "success",
+      "novo_status": "concluido"
+    }
+    ```
+
+### 4.2. Atualizar Tarefa
+**Rota:** `POST /tasks/update`
+**Descrição:** Edita detalhes da tarefa via Modal.
+* **Corpo (JSON):**
+    ```json
+    {
+      "id": 55,
       "descricao": "Lavar o carro",
-      "responsavel": "Casal",
-      "prioridade": 3  // 1=Baixa(Verde), 2=Média(Amarela), 3=Alta(Vermelha)
+      "responsavel": "Thiago",
+      "prioridade": 3
     }
-    \`\`\`
+    ```
+    * *Prioridade:* 1 (Baixa/Verde), 2 (Média/Amarela), 3 (Alta/Vermelha).
+* **Resposta (200 OK):** `{"status": "success"}`
+
+### 4.3. Arquivar Tarefas
+**Rota:** `POST /clear_tasks`
+**Descrição:** Altera status de tarefas `concluido` para `arquivado`.
+* **Resposta (200 OK):** `{"status": "success"}`
 
 ---
 
-## 📊 6. Dashboard & Widgets - [NOVO]
+## 🌐 5. Interfaces (Views/HTML)
 
-### \`GET /api/weather\`
-Retorna dados meteorológicos cacheados para o Dashboard.
-* **Descrição:** O backend consulta a API externa (OpenWeather/HG) no máximo 1x por hora e salva no banco para evitar rate-limit e latência.
-* **Retorno (200 OK):**
-    \`\`\`json
-    {
-      "city": "Itajaí",
-      "temp_now": 28,
-      "condition": "rain",
-      "forecast_weekend": {
-        "sat": {"min": 22, "max": 29, "desc": "Sol com nuvens"},
-        "sun": {"min": 23, "max": 30, "desc": "Pancadas de chuva"}
-      },
-      "updated_at": "14:30"
-    }
-    \`\`\`
+Estas rotas retornam HTML renderizado (Jinja2) para o navegador.
 
-### \`GET /api/inspiration\`
-Retorna a "Mensagem do Dia".
-* **Lógica:** Seleciona aleatoriamente de um banco local ou consulta API externa.
-* **Retorno (200 OK):**
-    \`\`\`json
-    {
-      "text": "O sucesso é a soma de pequenos esforços repetidos dia após dia.",
-      "author": "Robert Collier"
-    }
-    \`\`\`
+| Rota | Template | Descrição |
+| :--- | :--- | :--- |
+| `GET /` | `dashboard.html` | **Home:** Clima, Mensagem do Dia e Botões de Acesso. |
+| `GET /shopping` | `shopping.html` | **Mercado:** Lista de compras categorizada. |
+| `GET /tasks` | `tasks.html` | **Tarefas:** Quadro Kanban agrupado por responsável. |
+| `GET /login` | `login.html` | Formulário de acesso. |
 
 ---
 
-## 🌐 7. Navegação e Views
+## 🌍 6. APIs Externas Integradas
 
-### \`GET /\` (Dashboard)
-**[Alteração Planejada]** Passará a renderizar o Dashboard Geral com cards de resumo.
+O FamilyOS consome serviços de terceiros. As chaves ficam no arquivo `.env`.
 
-### \`GET /shopping\`
-Renderiza a Lista de Compras (o antigo \`/\`).
+### 6.1. Google Gemini (IA)
+* **Provider:** Google AI Studio.
+* **Modelo:** `gemini-2.5-flash`.
+* **Biblioteca:** `langchain-google-genai`.
+* **Uso:** Extração de entidades (JSON) a partir de linguagem natural.
 
-### \`GET /tasks\`
-Renderiza o quadro de Tarefas (Kanban ou Lista agrupada por Responsável).
+### 6.2. HG Brasil (Clima)
+* **Provider:** HG Weather API.
+* **Uso:** Exibir temperatura e condições atuais no Dashboard.
+* **Otimização:** Implementado sistema de **Cache no Banco** (`WeatherCache`).
+    * A API só é chamada se o cache for mais antigo que 60 minutos.
+    * Evita bloqueio por limite de requisições (Rate Limit).
+
+
+---
+# Sprint 9
+
+## ⏰ Módulo de Lembretes
+
+### `GET /reminders`
+Retorna a lista de lembretes do banco local Postgres.
+* **Filtros:** Próximos 7 dias, Atrasados.
+
+### `POST /reminders/create`
+Cria um lembrete novo.
+1.  Salva no Postgres (status 'sync_pending').
+2.  Dispara Webhook n8n para criar no Google.
+3.  Atualiza Postgres com o `google_id` retornado.
+
+### `POST /reminders/sync`
+Força uma sincronização manual (chama n8n para baixar dados do Google).
 
 ---
 
-## 8. Webhooks (n8n Router)
-
-O n8n agora atua como um roteador antes de chamar a API.
-
-1.  **Entrada:** Telegram Webhook.
-2.  **Classifier:** LLM decide se a intenção é \`SHOPPING\` ou \`TASK\`.
-3.  **Route:**
-    * Se \`SHOPPING\` -> POST \`/magic\`
-    * Se \`TASK\` -> POST \`/tasks/magic\`
+**Documentação gerada automaticamente pelo Alpha Agent.**

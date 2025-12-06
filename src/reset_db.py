@@ -1,27 +1,25 @@
-from app import app, db, User, Categoria, UnidadeMedida
+from app import app, db, User, Categoria, UnidadeMedida, Task, Reminder
 
 def reset():
     print("🔧 Iniciando Reset do Banco de Dados...")
     
-    # Garante que o app saiba onde está o banco (lendo do .env via app.py)
     print(f"📡 Conectando em: {app.config['SQLALCHEMY_DATABASE_URI']}")
 
     with app.app_context():
-        # 1. Limpa tudo (Dropa tabelas antigas se existirem)
+        # 1. Limpa tudo (Dropa tabelas antigas)
         db.drop_all()
         
-        # 2. Cria a estrutura nova (Schema)
+        # 2. Cria a estrutura nova (Incluindo a tabela 'reminders')
         db.create_all()
 
         # 3. Cria Usuários
         print("👤 Criando usuários...")
-        # Adicionando usuários com as senhas combinadas
         db.session.add(User(username='thiago', password_hash='2904'))
         db.session.add(User(username='debora', password_hash='1712'))
 
         # 4. Cria Categorias Padrão
         print("📂 Criando categorias...")
-        cats = ['HORTIFRÚTI', 'PADARIA', 'CARNES', 'LIMPEZA', 'BEBIDAS', 'OUTROS', 'LATICÍNIOS', 'HIGIENE PESSOAL']
+        cats = ['HORTIFRÚTI', 'PADARIA', 'CARNES', 'LIMPEZA', 'BEBIDAS', 'OUTROS', 'LATICÍNIOS', 'HIGIENE PESSOAL', 'VEGETAIS', 'AUTOMÓVEL']
         for c in cats: 
             db.session.add(Categoria(nome=c))
 
@@ -33,9 +31,10 @@ def reset():
         db.session.add(UnidadeMedida(nome='litro', simbolo='L'))
         db.session.add(UnidadeMedida(nome='pacote', simbolo='pct'))
         db.session.add(UnidadeMedida(nome='caixa', simbolo='cx'))
+        db.session.add(UnidadeMedida(nome='vez', simbolo='vez'))
 
         db.session.commit()
-        print("✅ SUCESSO! Banco Postgres resetado e populado.")
+        print("✅ SUCESSO! Banco Postgres resetado e tabelas (incluindo Lembretes) criadas.")
 
 if __name__ == "__main__":
     reset()

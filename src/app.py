@@ -16,6 +16,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, event
+from dateutil import parser # Pode precisar instalar: pip install python-dateutil
 
 # Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -120,6 +121,18 @@ class WeatherCache(db.Model):
     data_json = db.Column(db.Text) # JSON string da API externa
     last_updated = db.Column(db.DateTime)
 
+class Reminder(db.Model):
+    __tablename__ = 'reminders'
+    id = db.Column(db.Integer, primary_key=True)
+    google_id = db.Column(db.String(100), unique=True) # ID do Google para não duplicar
+    parent_id = db.Column(db.String(100), nullable=True) # Para saber se é subtarefa
+    title = db.Column(db.String(200), nullable=False)
+    notes = db.Column(db.Text, nullable=True) # Pode vir vazio
+    due_date = db.Column(db.DateTime, nullable=True) # Pode não ter data
+    status = db.Column(db.String(20)) # 'needsAction' ou 'completed'
+    usuario = db.Column(db.String(50)) # Vamos receber do n8n
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
 # --- FUNÇÕES AUXILIARES (HELPER FUNCTIONS) ---
 
 def get_weather_data():
@@ -208,24 +221,24 @@ def dashboard():
     # 1. Contadores (Badges)
     qtd_compras = ListaItem.query.filter_by(status='pendente').count()
     qtd_tarefas = Task.query.filter_by(status='pendente').count()
+    # NOVO: Conta lembretes do Google (needsAction = pendente)
+    qtd_lembretes = Reminder.query.filter_by(status='needsAction').count()
     
     # 2. Clima Real
     weather_data = get_weather_data()
-    clima = {"temp": "--", "desc": "Indisponível", "img_id": "32"} # Default
-    
-    forecast = [] # Para o fim de semana
+    clima = {"temp": "--", "desc": "Indisponível", "img_id": "32", "city": "Itajaí"} 
+    forecast = []
     
     if weather_data and 'results' in weather_data:
         res = weather_data['results']
         clima = {
             "temp": res.get('temp'),
             "desc": res.get('description'),
-            "img_id": res.get('img_id'), # HG Brasil usa IDs para ícones
+            "img_id": res.get('img_id'),
             "city": res.get('city'),
             "time": res.get('time')
         }
-        # Pega previsão dos próximos dias (para mostrar fim de semana)
-        forecast = res.get('forecast', [])[:3] # Pega hoje + 2 dias
+        forecast = res.get('forecast', [])[:3]
 
     # 3. Mensagem do Dia
     mensagem = get_daily_quote()
@@ -234,6 +247,7 @@ def dashboard():
                            active_page='dashboard',
                            qtd_compras=qtd_compras,
                            qtd_tarefas=qtd_tarefas,
+                           qtd_lembretes=qtd_lembretes, # Passando a nova variável
                            clima=clima,
                            forecast=forecast,
                            mensagem=mensagem)
@@ -489,6 +503,16 @@ def tasks_magic():
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
 
+@app.route('/reminders')
+@login_required
+def reminders_list():
+    # Busca tarefas pendentes e ordena por data
+    tasks = Reminder.query.filter(
+        or_(Reminder.status == 'needsAction', Reminder.status.is_(None))
+    ).order_by(Reminder.due_date.asc().nulls_last()).all()
+    
+    return render_template('reminders.html', tasks=tasks, active_page='reminders')
+
 @app.route('/tasks/update', methods=['POST'])
 @login_required
 def update_task():
@@ -504,6 +528,106 @@ def update_task():
     task.prioridade = int(d.get('prioridade'))
     
     db.session.commit()
+    return jsonify({'status': 'success'})
+
+# --- ROTA DE SINCRONIZAÇÃO DE LEMBRETES ---
+@app.route('/reminders/sync', methods=['POST'])
+def sync_reminders():
+    dados = request.get_json()
+    print(f"DEBUG PAYLOAD: {dados}") # Pode comentar se quiser limpar o log
+    
+    # Garante que seja uma lista para iterar
+    if isinstance(dados, dict): dados = [dados]
+    
+    usuario_padrao = request.args.get('usuario', 'Google') 
+
+    count_criado = 0
+    count_atualizado = 0
+
+    try:
+        for item in dados:
+            # CORREÇÃO AQUI: O n8n manda 'google_id', não 'id'
+            gid = item.get('google_id') 
+            
+            if not gid: 
+                print("Item sem ID ignorado")
+                continue 
+
+            lembrete = Reminder.query.filter_by(google_id=gid).first()
+
+            # Tratamento de Data
+            data_vencimento = None
+            if item.get('due'):
+                try:
+                    # O Google manda formato ISO com Z no final
+                    data_vencimento = datetime.datetime.fromisoformat(item.get('due').replace('Z', '+00:00'))
+                except:
+                    pass
+
+            if not lembrete:
+                lembrete = Reminder(google_id=gid)
+                db.session.add(lembrete)
+                count_criado += 1
+            else:
+                count_atualizado += 1
+
+            # Atualiza campos
+            lembrete.title = item.get('title', 'Sem Título')
+            lembrete.notes = item.get('notes')
+            lembrete.status = item.get('status')
+            lembrete.parent_id = item.get('parent') # O n8n precisa mandar esse campo se quiser hierarquia
+            lembrete.due_date = data_vencimento
+            lembrete.usuario = usuario_padrao
+            lembrete.last_updated = datetime.datetime.utcnow()
+
+        db.session.commit()
+        return jsonify({
+            "status": "success", 
+            "criados": count_criado, 
+            "atualizados": count_atualizado
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro Sync Lembretes: {traceback.format_exc()}")
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/reminders/update', methods=['POST'])
+@login_required
+def update_reminder():
+    d = request.get_json()
+    rem_id = int(d.get('id'))
+    
+    reminder = db.session.get(Reminder, rem_id)
+    if not reminder:
+        return jsonify({'error': 'Lembrete não encontrado'}), 404
+    
+    # Atualiza campos locais
+    reminder.title = d.get('title')
+    reminder.notes = d.get('notes')
+    
+    # Reconstrói data/hora
+    date_str = d.get('date') # YYYY-MM-DD
+    time_str = d.get('time') # HH:MM
+    
+    if date_str:
+        if time_str:
+            iso_str = f"{date_str}T{time_str}:00"
+        else:
+            iso_str = f"{date_str}T00:00:00"
+        
+        try:
+            reminder.due_date = datetime.datetime.fromisoformat(iso_str)
+        except:
+            pass # Mantém data antiga se falhar
+    
+    # Marca como pendente de sync (para o futuro n8n pegar)
+    # Por enquanto apenas salva
+    db.session.commit()
+    
+    # TODO: Disparar Webhook do n8n aqui para atualizar o Google Tasks
+    # requests.post(N8N_WEBHOOK_UPDATE_GOOGLE, json=d)
+
     return jsonify({'status': 'success'})
 
 if __name__ == '__main__':

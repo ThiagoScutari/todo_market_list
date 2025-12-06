@@ -1,225 +1,140 @@
-# Documentação FamilyOS v2.0 — Módulos e Funcionalidades
+# 🏗️ Documento Mestre de Arquitetura: FamilyOS
 
-## 1. Visão Geral do Sistema
-O **FamilyOS v2.0** é um sistema operacional doméstico que unifica gestão de compras, tarefas, clima e inspiração diária em uma única plataforma.
-
-**Tecnologias:**
-- Backend: Python Flask + SQLite + SQLAlchemy
-- Frontend: HTML5, CSS3 (Cyberpunk Dark Neon), JavaScript Vanilla
-- IA: Google Gemini Pro
-- Infraestrutura: Docker + Traefik + n8n
+**Versão:** v2.1 (The Home OS)
+**Data da Revisão:** 05/12/2025
+**Status:** ✅ Produção (Operacional)
+**Escopo:** Gestão Doméstica Unificada (Compras, Tarefas, Clima)
 
 ---
 
-## 2. Módulo Dashboard (Tela Inicial)
+## 1. Visão Estratégica
 
-### Layout
-A tela inicial é um Dashboard com:
+### 1.1. O Conceito "FamilyOS"
+O sistema evoluiu de uma lista de compras para um **Sistema Operacional da Casa**. Ele centraliza informações vitais e atua proativamente na organização da rotina familiar através de um Dashboard central.
 
-1. **Header:**
-   - Saudação dinâmica (“Bom dia, Thiago”)
-   - Ícone do clima + temperatura atual
-
-2. **Widget “Mensagem do Dia”**
-   - Card com fundo de vidro
-   - Frase inspiracional/religiosa (atualizada diariamente)
-
-3. **Widget “Estratégia do Tempo”**
-   - Resumo do dia (manhã/tarde/noite)
-   - Previsão do fim de semana (sábado e domingo)
-
-4. **Grid de Módulos (Botões Grandes):**
-   - 🛒 **Lista de Compras** (ativo, com badge de pendentes)
-   - ✅ **Tarefas** (ativo, com badge de alta prioridade)
-   - 🥗 **Inserir Ingredientes** (opaco, desabilitado)
-   - ⏰ **Lembretes** (opaco, desabilitado)
+### 1.2. Módulos do Sistema
+1.  **🏠 Dashboard:** Painel visual com Clima (Itajaí), Mensagem do Dia e Acesso Rápido.
+2.  **🛒 Mercado (Shopping):** Gestão de suprimentos com categorização automática.
+3.  **✅ Tarefas (Tasks):** Gestão de afazeres com:
+    * Atribuição automática (Thiago, Débora, Casal).
+    * Classificação de Prioridade (Baixa🟢, Média🟡, Alta🔴).
+    * Processamento de múltiplas tarefas em uma única mensagem.
+4.  **⏰ Futuro:** Ingredientes e Lembretes (Placeholders na UI).
 
 ---
 
-## 3. Módulo de Tarefas
+## 2. Arquitetura de Informação (UX/UI)
 
-### Funcionalidades
-- Adição via Telegram (voz/texto) ou manualmente
-- Atribuição automática por IA:
-  - **Explícita:** Nome na frase → responsável nomeado
-  - **Coletiva:** “Temos que” → responsável “Casal”
-  - **Implícita:** Sem nome → atribui ao remetente
-- Classificação de prioridade:
-  - 🟢 Baixa (verde)
-  - 🟡 Média (amarelo)
-  - 🔴 Alta (vermelho) → notificação por e-mail
-- Agrupamento visual:
-  - 👤 Thiago
-  - 👤 Debora
-  - 👥 Casal
+### 2.1. Estrutura de Navegação
+A aplicação agora utiliza uma arquitetura de **Base Template** com navegação inferior fixa.
 
-### Interface
-- **Task Card:**
-  - Checkbox circular (esquerda)
-  - Descrição da tarefa (centro)
-  - Bolinha colorida de prioridade (direita)
-- **Interações:**
-  - Clique: marcar/desmarcar
-  - Long Press (800ms): abrir modal de edição
-- **Edição via modal:**
-  - Alterar responsável (dropdown: Thiago, Debora, Casal)
-  - Alterar prioridade (radio: baixa, média, alta)
-
-### API Endpoints (Tarefas)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| POST | `/tasks/magic` | Processa texto natural, atribui responsável e prioridade |
-| POST | `/tasks/toggle/<id>` | Alterna status (pendente/concluído) |
-| POST | `/tasks/update` | Edita descrição, responsável ou prioridade |
-| GET | `/tasks` | Renderiza o quadro de tarefas (frontend) |
+* **Rota \`/\` (Dashboard):**
+    * Widget de Clima (API HG Brasil com Cache).
+    * Frase Inspiracional.
+    * Botões de Acesso Rápido com Badges de Notificação (Pendências).
+* **Rota \`/shopping\` (Mercado):** Lista clássica com checkboxes e edição via Long Press.
+* **Rota \`/tasks\` (Tarefas):** Quadro de tarefas agrupado por Responsável.
 
 ---
 
-## 4. Módulo de Compras (Mantido v1.2)
+## 3. Regras de Negócio e Inteligência (n8n + Gemini)
 
-### Funcionalidades
-- Adição via Telegram (IA processa áudio/texto)
-- Categorização automática
-- Checkbox otimista com vibração
-- Edição via Long Press
-- Limpeza de carrinho (arquivamento)
+### 3.1. Roteamento de Intenção (n8n Router)
+O n8n atua como triagem inicial. Um LLM analisa o texto/áudio e decide a rota:
+* **SHOPPING:** *"Comprar pão"* -> Posta em \`/magic\`.
+* **TASK:** *"Lavar o carro"* -> Posta em \`/tasks/magic\`.
 
-### API Endpoints (Compras)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| POST | `/magic` | Processa transcrição e insere itens |
-| POST | `/toggle_item/<id>` | Alterna status (pendente/comprado) |
-| POST | `/update_item` | Edita nome e categoria do item |
-| POST | `/clear_cart` | Arquivar itens comprados |
-| GET | `/shopping` | Renderiza a lista de compras |
+### 3.2. Lógica de Tarefas (NLP Avançado)
+O endpoint \`/tasks/magic\` utiliza o Google Gemini 2.5 Flash para extrair uma **Lista de Objetos**:
 
----
-
-## 5. API de Dados do Dashboard
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/api/weather` | Retorna dados meteorológicos cacheados (atualizado a cada 1h) |
-| GET | `/api/inspiration` | Retorna mensagem do dia (API externa ou banco local) |
+1.  **Multi-Tasking:** Uma mensagem como *"Lavar o carro e comprar remédio"* gera ações distintas.
+2.  **Atribuição de Responsável:**
+    * Explícito: *"Thiago lavar louça"* -> Thiago.
+    * Coletivo: *"Temos que ir..."* -> Casal.
+    * Implícito: Se não citado, atribui ao remetente do Telegram.
+3.  **Prioridade:** Análise semântica de urgência ("agora", "hoje", "sem falta" = Alta).
 
 ---
 
-## 6. Banco de Dados (Schema v2.0)
+## 4. Banco de Dados (Schema v2.1 - PostgreSQL)
 
-### Tabela `tasks`
+O sistema migrou de SQLite para **PostgreSQL 15** rodando em Docker.
+
+### 4.1. Tabela \`tasks\`
+| Campo | Tipo | Detalhes |
+| :--- | :--- | :--- |
+| \`id\` | Integer | PK |
+| \`descricao\` | String | O que fazer. |
+| \`responsavel\` | String | 'Thiago', 'Debora', 'Casal'. |
+| \`prioridade\` | Integer | 1 (Verde), 2 (Amarelo), 3 (Vermelho). |
+| \`status\` | String | 'pendente', 'concluido', 'arquivado'. |
+| \`created_at\` | DateTime | Data de criação. |
+
+### 4.2. Tabela \`weather_cache\`
+Cache para evitar rate-limit da API HG Brasil.
+| Campo | Tipo | Detalhes |
+| :--- | :--- | :--- |
+| \`id\` | Integer | PK |
+| \`city\` | String | 'Itajai,SC'. |
+| \`data_json\` | Text | JSON completo da API. |
+| \`last_updated\` | DateTime | Atualiza se > 60 min. |
+
+*(As tabelas \`users\`, \`lista_itens\`, \`produtos\` e \`categorias\` permanecem iguais à v1.2)*
+
+---
+
+## 5. Infraestrutura e Deploy
+
+### 5.1. Docker Compose (Híbrido)
+* **Produção (VPS):** Roda App (Flask), Banco (Postgres), Traefik e n8n na mesma rede.
+* **Desenvolvimento (Local):** Docker roda apenas o Banco de Dados. Python roda localmente para debug.
+
+### 5.2. Variáveis de Ambiente (.env)
+Novas chaves adicionadas:
+\`\`\`bash
+# Postgres
+DB_USER=family_user
+DB_PASSWORD=***
+DATABASE_URL=postgresql://...
+
+# API Externa
+HGBRASIL_KEY=***
+\`\`\`
+
+---
+
+## 6. Roadmap de Execução
+
+| Sprint | Foco | Status |
+| :--- | :--- | :--- |
+| **Sprint 7** | Persistência e Base IA | ✅ Concluído |
+| **Sprint 8** | Módulo Tarefas e Postgres | ✅ Concluído |
+| **Sprint 9** | Dashboard e Clima | ✅ Concluído |
+| **Sprint 10** | Refinamento de Lembretes | 🔮 Futuro |
+
+---
+# Sprint 9
+
+## 🆕 Módulo: Lembretes (Google Tasks Sync)
+
+### Visão Geral
+Gerenciamento de compromissos com data e hora marcadas, sincronizados bidirecionalmente com o Google Tasks.
+
+### Regras de Negócio
+1.  **Fonte da Verdade Híbrida:** O sistema aceita alterações tanto do FamilyOS quanto do Google Apps.
+2.  **Agendamento:** Obrigatório ter Data. Hora é opcional (Dia inteiro).
+3.  **Vínculo com Gmail:** Se a tarefa vier de um e-mail, deve exibir um link "Abrir Gmail".
+4.  **Notificações:** O próprio app do Google Tasks no celular cuidará dos push notifications (nós não precisamos recriar isso).
+
+### Banco de Dados: Tabela `reminders`
 | Campo | Tipo | Descrição |
-|-------|------|-----------|
-| id | Integer | PK |
-| descricao | String | Descrição da tarefa |
-| responsavel | String | 'Thiago', 'Debora', 'Casal' |
-| prioridade | Integer | 1=Baixa, 2=Média, 3=Alta |
-| status | String | 'pendente', 'concluido' |
-| prazo | DateTime | Opcional |
-| created_at | DateTime | Data de criação |
+| :--- | :--- | :--- |
+| `id` | Integer (PK) | ID Interno. |
+| `google_id` | String (Unique) | ID da tarefa no Google (para sync). |
+| `title` | String | Título do lembrete. |
+| `notes` | Text | Detalhes ou Link do Gmail. |
+| `due_date` | DateTime | Data/Hora de vencimento. |
+| `status` | String | 'needsAction' (pendente) ou 'completed'. |
+| `last_sync` | DateTime | Quando foi atualizado pela última vez. |
 
-### Tabela `weather_cache`
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| id | Integer | PK (singleton) |
-| city | String | 'Itajaí' |
-| data_json | JSON | Payload da API de clima |
-| last_updated | DateTime | Última atualização |
-
-### Tabela `inspiration_cache`
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| id | Integer | PK (singleton) |
-| text | String | Texto da mensagem |
-| author | String | Autor (se houver) |
-| last_updated | DateTime | Última atualização |
-
----
-
-## 7. Integrações Externas
-
-### 7.1 Meteorologia
-- **Provedor:** OpenWeatherMap ou HG Brasil
-- **Frequência:** Cache de 1 hora
-- **Dados:** Temperatura, condição, previsão 3 dias
-
-### 7.2 Mensagem do Dia
-- **Provedor:** API de citações (ex.: TheySaidSo) ou banco local
-
-### 7.3 n8n (Roteador de Intenção)
-1. Recebe webhook do Telegram
-2. Classifica intenção (`SHOPPING` ou `TASK`)
-3. Roteia para o endpoint correspondente (`/magic` ou `/tasks/magic`)
-
-### 7.4 Notificações por E-mail
-- Disparadas quando:
-  - Tarefa com prioridade **Alta** é criada
-  - Responsável: Thiago, Debora ou ambos (Casal)
-
----
-
-## 8. Estratégia de Desenvolvimento (Roadmap)
-
-### Fase 1 — Fundação
-- Criar tabelas `tasks`, `weather_cache`, `inspiration_cache`
-- Implementar endpoints de tarefas e dashboard
-
-### Fase 2 — Inteligência
-- Configurar n8n para roteamento de intenção
-- Ajustar prompt do Gemini para extrair responsável e prioridade
-
-### Fase 3 — Frontend
-- Criar `home.html` (Dashboard)
-- Criar `tasks.html` (Quadro de tarefas)
-- Mover lista de compras para `shopping.html`
-
-### Fase 4 — Notificações
-- Configurar SMTP para envio de e-mails
-- Implementar disparo automático para tarefas de alta prioridade
-
----
-
-## 9. Design System (Cyberpunk Dark Neon)
-
-### Cores Principais
-| Variável | Cor | Uso |
-|----------|-----|-----|
-| `--bg` | `#050509` | Fundo principal |
-| `--glass` | `rgba(66,79,105,0.25)` | Efeito vidro |
-| `--neon-p` | `#611af0` | Roxo (destaque) |
-| `--neon-g` | `#22ff7a` | Verde (sucesso) |
-| `--neon-r` | `#ff3131` | Vermelho (urgente) |
-
-### Cores de Prioridade (Tarefas)
-| Nível | Cor | Hex |
-|-------|-----|-----|
-| Baixa | Verde | `#22ff7a` |
-| Média | Dourado | `#ffb800` |
-| Alta | Vermelho | `#ff3131` |
-
----
-
-## 10. Estrutura de Arquivos
-
-```
-familyos/
-├── src/
-│   ├── app.py
-│   ├── templates/
-│   │   ├── home.html       # Dashboard
-│   │   ├── shopping.html   # Lista de compras
-│   │   ├── tasks.html      # Quadro de tarefas
-│   │   └── login.html
-│   └── static/css/styles.css
-├── docs/
-│   ├── api_docs.md
-│   ├── frontend_docs.md
-│   ├── env_setup_docker.md
-│   └── project_specs.md
-└── data/
-    └── familyos.db
-```
-
----
-
-**Autor:** Thiago Scutari  
-**Visão:** Transformar a casa em uma empresa autogerenciável.
+**Autor:** Thiago Scutari.

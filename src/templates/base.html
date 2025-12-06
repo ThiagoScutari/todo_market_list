@@ -11,9 +11,9 @@
 </head>
 <body>
     <header>
-        <h1><i class="bi bi-cpu"></i> FamilyOS <span style="font-size:0.5em; opacity:0.5; vertical-align:middle">v2.0</span></h1>
+        <h1><i class="bi bi-cpu"></i> FamilyOS <span style="font-size:0.5em; opacity:0.5; vertical-align:middle">v2.1</span></h1>
         <div class="user-controls">
-            <a href="/logout"><i class="bi bi-box-arrow-right"></i></a>
+            <a href="/logout" style="color:white; text-decoration:none;"><i class="bi bi-box-arrow-right"></i></a>
         </div>
     </header>
 
@@ -34,10 +34,14 @@
             <i class="bi bi-check-square-fill"></i>
             <span>Tarefas</span>
         </a>
+        <a href="/reminders" class="nav-item {% if active_page == 'reminders' %}active{% endif %}">
+            <i class="bi bi-alarm-fill"></i>
+            <span>Lembretes</span>
+        </a>
     </nav>
 
     <script>
-        // Scripts globais (ex: PWA, Service Worker)
+        // Scripts globais se necessário
     </script>
     {% block extra_js %}{% endblock %}
 </body>
