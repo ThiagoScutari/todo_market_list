@@ -530,37 +530,47 @@ def update_task():
     db.session.commit()
     return jsonify({'status': 'success'})
 
-# --- ROTA DE SINCRONIZAÇÃO DE LEMBRETES ---
+# --- ROTA DE SINCRONIZAÇÃO DE LEMBRETES (v2.2 - Com Deletar) ---
 @app.route('/reminders/sync', methods=['POST'])
 def sync_reminders():
     dados = request.get_json()
-    print(f"DEBUG PAYLOAD: {dados}") # Pode comentar se quiser limpar o log
     
-    # Garante que seja uma lista para iterar
+    # Garante que seja uma lista
     if isinstance(dados, dict): dados = [dados]
     
     usuario_padrao = request.args.get('usuario', 'Google') 
 
     count_criado = 0
     count_atualizado = 0
+    count_deletado = 0
 
     try:
         for item in dados:
-            # CORREÇÃO AQUI: O n8n manda 'google_id', não 'id'
-            gid = item.get('google_id') 
-            
-            if not gid: 
-                print("Item sem ID ignorado")
-                continue 
+            gid = item.get('google_id')
+            if not gid: continue
 
+            # Busca no banco local
             lembrete = Reminder.query.filter_by(google_id=gid).first()
 
+            # --- LÓGICA DE DELEÇÃO ---
+            # Se o Google diz que deletou ("deleted": true), nós removemos do banco
+            is_deleted = item.get('deleted')
+            # O json do n8n pode vir como booleano True ou string "true" dependendo da versão
+            if is_deleted is True or str(is_deleted).lower() == 'true':
+                if lembrete:
+                    db.session.delete(lembrete)
+                    count_deletado += 1
+                continue # Pula para o próximo, não faz update nem create
+
+            # --- LÓGICA DE CRIAÇÃO/ATUALIZAÇÃO (Mantida) ---
+            
             # Tratamento de Data
             data_vencimento = None
             if item.get('due'):
                 try:
-                    # O Google manda formato ISO com Z no final
-                    data_vencimento = datetime.datetime.fromisoformat(item.get('due').replace('Z', '+00:00'))
+                    # Remove o Z final se existir para compatibilidade
+                    iso_date = item.get('due').replace('Z', '')
+                    data_vencimento = datetime.datetime.fromisoformat(iso_date)
                 except:
                     pass
 
@@ -575,16 +585,19 @@ def sync_reminders():
             lembrete.title = item.get('title', 'Sem Título')
             lembrete.notes = item.get('notes')
             lembrete.status = item.get('status')
-            lembrete.parent_id = item.get('parent') # O n8n precisa mandar esse campo se quiser hierarquia
+            lembrete.parent_id = item.get('parent')
             lembrete.due_date = data_vencimento
+            lembrete.webViewLink = item.get('webViewLink')
             lembrete.usuario = usuario_padrao
             lembrete.last_updated = datetime.datetime.utcnow()
 
         db.session.commit()
+        
         return jsonify({
             "status": "success", 
             "criados": count_criado, 
-            "atualizados": count_atualizado
+            "atualizados": count_atualizado,
+            "deletados": count_deletado
         }), 200
 
     except Exception as e:
@@ -627,7 +640,7 @@ def update_reminder():
     
     # TODO: Disparar Webhook do n8n aqui para atualizar o Google Tasks
     # requests.post(N8N_WEBHOOK_UPDATE_GOOGLE, json=d)
-
+    
     return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
