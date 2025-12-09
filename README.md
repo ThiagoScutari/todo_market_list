@@ -46,6 +46,30 @@ Um quadro de gestão de vida. A IA define automaticamente:
 
 ---
 
+### 📧 Módulo 3: Briefing Matinal (Agente de IA)
+Mais do que uma notificação, um ritual diário. Todo dia às **06:55**, o sistema envia um e-mail HTML rico para o casal, atuando como um "Mentor Sábio".
+
+#### 🤖 O Agente Inteligente
+Utilizando a API da OpenAI (`gpt-5o-nano`), configuramos um agente com a persona de um "Mentor Carinhoso e Sofisticado". Ele não apenas preenche lacunas, mas cria contexto emocional:
+* **Saudação Dinâmica:** Gera adjetivos de poder variáveis (ex: *"Bom dia, Guardiões do Lar!"*, *"Bom dia, Arquitetos do Futuro!"*).
+* **Curadoria de Sabedoria:** O agente é instruído via Prompt Engineering a selecionar exclusivamente citações **Bíblicas** ou **Estóicas** sobre disciplina e amor, evitando frases motivacionais genéricas.
+* **Análise Climática:** Interpreta os dados brutos da API HG Brasil para dar conselhos práticos (ex: *"Vai chover à tarde, levem guarda-chuva!"*).
+
+#### 🎨 Layout & Engenharia do HTML
+O e-mail foge do padrão texto puro. Criamos um template injetável via JavaScript no n8n com design **"Dark Glassmorphism"**:
+* **Estética:** Fundo escuro (`#050509`), cartões translúcidos com *backdrop-filter*, gradientes Neon e tipografia moderna.
+* **Responsividade:** O CSS é otimizado via *media queries* para garantir que checklists e ícones não distorçam em telas de celular (mobile-first).
+* **Blindagem de Dados:** Um parser Javascript robusto (com Regex) extrai o JSON da IA e aplica *fallbacks* automáticos. Se a IA falhar ou alucinar, o e-mail é enviado com dados padrão, garantindo que o briefing nunca deixe de chegar.
+
+#### 🧩 Variáveis Injetadas
+O n8n orquestra a fusão de múltiplas fontes de dados em tempo real antes de renderizar o HTML:
+* `{{tarefas}}`: Busca tarefas pendentes ("Hoje") direto da **API do Google Tasks**.
+* `{{mercado}}`: Executa uma query SQL direta no **PostgreSQL** para listar itens pendentes.
+* `{{clima}}`: Dados em tempo real da API externa.
+* **Mensagem Pessoal:** Um bloco com uma mensagem no final
+
+---
+
 ## ✨ Experiência do Usuário (UX)
 
 ### Feedback Visual e Tátil

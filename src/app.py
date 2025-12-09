@@ -16,7 +16,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, event
-from dateutil import parser # Pode precisar instalar: pip install python-dateutil
+from dateutil import parser 
+from werkzeug.security import check_password_hash
 
 # Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -141,10 +142,10 @@ def get_weather_data():
     """
     cidade = "Itajai,SC" # Ajuste se necessário
     agora = datetime.datetime.utcnow()
-    
+
     # 1. Tenta buscar no Cache
     cache = WeatherCache.query.first()
-    
+
     # Verifica se o cache é válido (menos de 60 minutos)
     if cache and cache.last_updated and (agora - cache.last_updated).total_seconds() < 3600:
         logger.info("Usando Clima do Cache Local")
@@ -163,16 +164,16 @@ def get_weather_data():
         url = f"https://api.hgbrasil.com/weather?key={chave}&city_name={cidade}"
         response = requests.get(url)
         dados = response.json()
-        
+
         # Salva no Banco
         if not cache:
             cache = WeatherCache(city=cidade)
             db.session.add(cache)
-        
+
         cache.data_json = json.dumps(dados)
         cache.last_updated = agora
         db.session.commit()
-        
+
         return dados
     except Exception as e:
         logger.error(f"Erro API Clima: {e}")
@@ -191,7 +192,7 @@ def get_daily_quote():
         "Fé na vida, fé no homem, fé no que virá."
     ]
     return random.choice(frases)
-    
+
 
 @login_manager.user_loader
 def load_user(user_id): return db.session.get(User, int(user_id))
@@ -200,15 +201,27 @@ def load_user(user_id): return db.session.get(User, int(user_id))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated: return redirect(url_for('dashboard'))
+    # Se já estiver logado, manda para o dashboard
+    if current_user.is_authenticated: 
+        return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
         u = request.form.get('username')
         p = request.form.get('password')
+        
+        # Busca o usuário no banco (case insensitive para evitar erros de digitação)
         user = User.query.filter(User.username.ilike(u.strip())).first()
-        if user and user.check_password(p):
+        
+        # --- VERIFICAÇÃO DE SEGURANÇA ---
+        # 1. Verifica se o usuário existe
+        # 2. Compara a senha digitada (p) com o Hash salvo no banco (user.password_hash)
+        if user and check_password_hash(user.password_hash, p):
             login_user(user, remember=True)
             return redirect(url_for('dashboard'))
-        flash('Erro login')
+        
+        # Se falhar
+        flash('Usuário ou senha incorretos', 'error')
+        
     return render_template('login.html')
 
 @app.route('/logout')
@@ -223,12 +236,12 @@ def dashboard():
     qtd_tarefas = Task.query.filter_by(status='pendente').count()
     # NOVO: Conta lembretes do Google (needsAction = pendente)
     qtd_lembretes = Reminder.query.filter_by(status='needsAction').count()
-    
+
     # 2. Clima Real
     weather_data = get_weather_data()
-    clima = {"temp": "--", "desc": "Indisponível", "img_id": "32", "city": "Itajaí"} 
+    clima = {"temp": "--", "desc": "Indisponível", "img_id": "32", "city": "Itajaí"}
     forecast = []
-    
+
     if weather_data and 'results' in weather_data:
         res = weather_data['results']
         clima = {
@@ -243,7 +256,7 @@ def dashboard():
     # 3. Mensagem do Dia
     mensagem = get_daily_quote()
 
-    return render_template('dashboard.html', 
+    return render_template('dashboard.html',
                            active_page='dashboard',
                            qtd_compras=qtd_compras,
                            qtd_tarefas=qtd_tarefas,
@@ -270,7 +283,7 @@ def shopping_list():
 def task_board():
     # ALTERAÇÃO: Busca pendentes E concluidas (para não sumir da tela)
     tasks = Task.query.filter(or_(Task.status=='pendente', Task.status=='concluido')).order_by(Task.prioridade.desc(), Task.created_at.asc()).all()
-    
+
     view = {'Thiago': [], 'Debora': [], 'Casal': []}
     for t in tasks:
         resp = t.responsavel if t.responsavel in view else 'Thiago'
@@ -315,7 +328,7 @@ def update():
     cat = Categoria.query.filter_by(nome=cat_nome).first()
     if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
     prod = Produto.query.filter_by(nome=prod_nome).first()
-    if not prod: 
+    if not prod:
         prod = Produto(nome=prod_nome, categoria_id=cat.id, emoji=i.produto.emoji, unidade_padrao_id=i.produto.unidade_padrao_id)
         db.session.add(prod); db.session.flush()
     else: prod.categoria_id = cat.id
@@ -341,7 +354,7 @@ def magic():
         res = chain.invoke({"texto": d.get('texto')})
         content = res.content
         logger.info(f"Raw IA: {content}")
-        
+
         start_idx = content.find('[')
         end_idx = content.rfind(']')
         if start_idx != -1 and end_idx != -1:
@@ -352,10 +365,10 @@ def magic():
             dados = json.loads(clean)
 
         if isinstance(dados, dict): dados = [dados]
-        
+
         itens_salvos = []
         itens_ignorados = []
-        
+
         for x in dados:
             n = x.get('nome', 'item').lower().strip()
             c_nome = x.get('categoria', 'OUTROS').upper().strip()
@@ -364,7 +377,7 @@ def magic():
             if not cat: cat = Categoria(nome=c_nome); db.session.add(cat); db.session.flush()
             und = UnidadeMedida.query.filter_by(simbolo=x.get('unidade','un')).first()
             prod = Produto.query.filter_by(nome=n).first()
-            if not prod: 
+            if not prod:
                 prod = Produto(nome=n, emoji=x.get('emoji'), categoria_id=cat.id, unidade_padrao_id=und.id if und else None)
                 db.session.add(prod); db.session.flush()
             existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, or_(ListaItem.status=='pendente', ListaItem.status=='comprado')).first()
@@ -374,7 +387,7 @@ def magic():
                 db.session.add(ListaItem(produto_id=prod.id, quantidade=x.get('quantidade', 1), usuario=d.get('usuario','Anônimo'), origem_input="voice"))
                 itens_salvos.append(prod.nome.title())
         db.session.commit()
-        
+
         msg_parts = []
         if itens_salvos: msg_parts.append(f"✅ Adicionados: {', '.join(itens_salvos)}")
         if itens_ignorados: msg_parts.append(f"⚠️ Já na lista: {', '.join(itens_ignorados)}")
@@ -402,17 +415,17 @@ def tasks_magic():
     # 1. Configura IA
     try:
         model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
-        
+
         # Prompt Atualizado: Pede uma LISTA de objetos JSON
         prompt = """
         Você é um assistente de gestão doméstica. Analise o pedido e extraia uma LISTA de tarefas.
         Se houver mais de uma ação na mesma frase, separe em itens diferentes.
-        
+
         Retorne APENAS um JSON array neste formato:
         [
             {{
                 "descricao": "Ação 1",
-                "responsavel": "Quem?", 
+                "responsavel": "Quem?",
                 "prioridade": 1, 2 ou 3
             }},
             {{
@@ -441,7 +454,7 @@ def tasks_magic():
 
     d = request.get_json()
     if not d: return jsonify({'erro': 'Sem dados'}), 400
-    
+
     texto = d.get('texto')
     remetente = d.get('remetente') or d.get('usuario') or 'Alguém'
 
@@ -450,7 +463,7 @@ def tasks_magic():
         logger.info(f"Processando Tarefa: {texto}")
         res = chain.invoke({"texto": texto})
         content = res.content
-        
+
         # Parser JSON de Lista (Blindado)
         start_idx = content.find('[')
         end_idx = content.rfind(']')
@@ -468,7 +481,7 @@ def tasks_magic():
 
         # 3. Processamento em Lote
         msgs_telegram = []
-        
+
         for item in dados:
             # Lógica de Atribuição
             resp_ia = item.get('responsavel', 'Outro')
@@ -485,7 +498,7 @@ def tasks_magic():
                 status='pendente'
             )
             db.session.add(nova_task)
-            
+
             # Prepara mensagem de retorno
             icones = {1: "🟢", 2: "🟡", 3: "🔴"}
             p_icon = icones.get(nova_task.prioridade, "⚪")
@@ -510,7 +523,7 @@ def reminders_list():
     tasks = Reminder.query.filter(
         or_(Reminder.status == 'needsAction', Reminder.status.is_(None))
     ).order_by(Reminder.due_date.asc().nulls_last()).all()
-    
+
     return render_template('reminders.html', tasks=tasks, active_page='reminders')
 
 @app.route('/tasks/update', methods=['POST'])
@@ -518,15 +531,15 @@ def reminders_list():
 def update_task():
     d = request.get_json()
     task_id = int(d.get('id'))
-    
+
     task = db.session.get(Task, task_id)
     if not task:
         return jsonify({'error': 'Tarefa não encontrada'}), 404
-    
+
     task.descricao = d.get('descricao')
     task.responsavel = d.get('responsavel')
     task.prioridade = int(d.get('prioridade'))
-    
+
     db.session.commit()
     return jsonify({'status': 'success'})
 
@@ -534,11 +547,11 @@ def update_task():
 @app.route('/reminders/sync', methods=['POST'])
 def sync_reminders():
     dados = request.get_json()
-    
+
     # Garante que seja uma lista
     if isinstance(dados, dict): dados = [dados]
-    
-    usuario_padrao = request.args.get('usuario', 'Google') 
+
+    usuario_padrao = request.args.get('usuario', 'Google')
 
     count_criado = 0
     count_atualizado = 0
@@ -563,7 +576,7 @@ def sync_reminders():
                 continue # Pula para o próximo, não faz update nem create
 
             # --- LÓGICA DE CRIAÇÃO/ATUALIZAÇÃO (Mantida) ---
-            
+
             # Tratamento de Data
             data_vencimento = None
             if item.get('due'):
@@ -592,10 +605,10 @@ def sync_reminders():
             lembrete.last_updated = datetime.datetime.utcnow()
 
         db.session.commit()
-        
+
         return jsonify({
-            "status": "success", 
-            "criados": count_criado, 
+            "status": "success",
+            "criados": count_criado,
             "atualizados": count_atualizado,
             "deletados": count_deletado
         }), 200
@@ -615,32 +628,58 @@ def update_reminder():
     if not reminder:
         return jsonify({'error': 'Lembrete não encontrado'}), 404
     
-    # Atualiza campos locais
+    # 1. Atualiza campos locais
     reminder.title = d.get('title')
     reminder.notes = d.get('notes')
     
-    # Reconstrói data/hora
+    # 2. Reconstrói data/hora
     date_str = d.get('date') # YYYY-MM-DD
     time_str = d.get('time') # HH:MM
+    
+    # Inicializa variável para o Google (Importante!)
+    iso_date_for_google = None 
     
     if date_str:
         if time_str:
             iso_str = f"{date_str}T{time_str}:00"
+            # Formato UTC com Z para o Google
+            iso_date_for_google = f"{date_str}T{time_str}:00.000Z"
         else:
             iso_str = f"{date_str}T00:00:00"
+            # Google Tasks requer T00:00:00Z para tarefas de dia inteiro
+            iso_date_for_google = f"{date_str}T00:00:00.000Z"
         
         try:
             reminder.due_date = datetime.datetime.fromisoformat(iso_str)
         except:
             pass # Mantém data antiga se falhar
-    
-    # Marca como pendente de sync (para o futuro n8n pegar)
-    # Por enquanto apenas salva
+
     db.session.commit()
     
-    # TODO: Disparar Webhook do n8n aqui para atualizar o Google Tasks
-    # requests.post(N8N_WEBHOOK_UPDATE_GOOGLE, json=d)
-    
+    # 3. Dispara Sincronia com Google (Via n8n)
+    try:
+        webhook_url = os.getenv('N8N_WEBHOOK_TASKS') # Pega do .env
+        
+        if webhook_url and reminder.google_id:
+            payload = {
+                "action": "update",
+                "google_id": reminder.google_id,
+                "title": reminder.title,
+                "notes": reminder.notes
+            }
+            
+            # Agora a variável existe!
+            if iso_date_for_google:
+                payload["due"] = iso_date_for_google
+            
+            # Envia para o n8n
+            logger.info(f"🚀 Enviando update para n8n: {payload}")
+            requests.post(webhook_url, json=payload, timeout=2)
+            
+    except Exception as e:
+        logger.error(f"❌ Erro no envio para n8n: {e}")
+        # Não retorna erro para o usuário pois salvou localmente
+
     return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
