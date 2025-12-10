@@ -11,6 +11,9 @@ venv/
 todo_market.db
 historico_v*.db
 __pycache__/
+data/
+*.pyc
+
 
 #Codigos gerados pelo Builder
 /codigo_gerado
