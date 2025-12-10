@@ -9,6 +9,8 @@ from langchain.chat_models import init_chat_model
 from langchain.tools import tool
 from langgraph.checkpoint.sqlite import SqliteSaver
 
+
+
 # --- 1. CONFIGURAÇÃO ---
 try:
     load_dotenv()
@@ -45,7 +47,9 @@ conn = sqlite3.connect("memoria_v11_fixed.db", check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)
 
 # Forçando Lite para evitar bloqueios e alucinações criativas
-model = init_chat_model("gemini-2.5-pro", model_provider="google_genai", temperature=0.1)
+# model = init_chat_model("gemini-2.5-pro", model_provider="google_genai", temperature=0.1)
+model = init_chat_model("gpt-5-mini", model_provider="openai", temperature=0.1)
+model_builder = init_chat_model("gpt-5.1-codex", model_provider="openai", temperature=0.0)
 
 historico_sessao = []
 
@@ -92,7 +96,7 @@ experience = create_agent(model, tools=[], system_prompt=f"{prompt_base}\nVocê 
 
 # BUILDER BLINDADO v2 (Protocolo de Preservação Visual)
 builder = create_agent(
-    model, 
+    model_builder, 
     tools=[escrever_codigo, ler_codigo_fonte], 
     system_prompt=f"""
     VOCÊ É O BUILDER. UM ROBÔ DE CODIFICAÇÃO.

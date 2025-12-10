@@ -126,6 +126,7 @@ class Reminder(db.Model):
     __tablename__ = 'reminders'
     id = db.Column(db.Integer, primary_key=True)
     google_id = db.Column(db.String(100), unique=True) # ID do Google para não duplicar
+    calendar_id = db.Column(db.String(100), nullable=True) # <--- NOVO: Adicione esta linha
     parent_id = db.Column(db.String(100), nullable=True) # Para saber se é subtarefa
     title = db.Column(db.String(200), nullable=False)
     notes = db.Column(db.Text, nullable=True) # Pode vir vazio
@@ -409,9 +410,187 @@ def toggle_task(id):
         return jsonify({'status': 'success', 'novo_status': t.status})
     return jsonify({'status': 'error'}), 404
 
-# --- NOVO ENDPOINT DE TAREFAS (v2.1 - Multi-Tasks) ---
-@app.route('/tasks/magic', methods=['POST'])
+@app.route('/voice/process', methods=['POST'])
+def voice_process():
+    d = request.get_json()
+    texto_entrada = d.get('texto', '')
+    usuario = d.get('usuario', 'Voz')
+
+    if not texto_entrada:
+        return jsonify({'erro': 'Texto vazio'}), 400
+
+    # Contexto Temporal
+    agora = datetime.datetime.now()
+    str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
+    data_hoje_iso = agora.strftime("%Y-%m-%d") # Usado para fallback
+
+    # 1. Configuração da IA
+    try:
+        model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
+        
+        template_str = """
+        Você é o FamilyOS. Data atual: {data_atual}.
+        Analise o texto e extraia JSON:
+        {{
+            "shopping": [ {{ "nome": "item", "qty": 1, "cat": "CATEGORIA" }} ],
+            "tasks": [ {{ "desc": "ação", "resp": "Nome", "prio": 1-3 }} ],
+            "reminders": [ {{ "title": "título", "date": "YYYY-MM-DD", "time": "HH:MM", "notes": "detalhes" }} ]
+        }}
+        Regras:
+        - Shopping Cats: PADARIA, CARNES, LIMPEZA, HORTIFRÚTI, OUTROS.
+        - Task Prio: 1(Baixa), 2(Média), 3(Alta). Resp: Thiago, Debora, Casal.
+        - Reminders: Se disser apenas a hora (ex: "às 14h"), assuma a data de HOJE. Se não tiver hora, time=null.
+        
+        Texto: "{texto}"
+        """
+        
+        prompt = ChatPromptTemplate.from_template(template_str)
+        chain = prompt | model
+        
+        res = chain.invoke({"data_atual": str_agora, "texto": texto_entrada})
+        
+        # Limpeza e Parsing
+        clean_json = re.sub(r'```json|```', '', res.content).strip()
+        dados = json.loads(clean_json)
+        
+        # LOG DE DEBUG 1: O que a IA entendeu?
+        logger.info(f"🤖 RAW JSON IA: {dados}")
+
+    except Exception as e:
+        logger.error(f"Erro AI Processor: {traceback.format_exc()}")
+        return jsonify({'erro': 'Falha na interpretação da IA'}), 500
+
+    logs_acao = []
+    
+    # Carrega URL e remove espaços extras caso existam no .env
+    webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
+    
+    # LOG DE DEBUG 2: A URL existe?
+    logger.info(f"🔗 URL Webhook carregada: '{webhook_create_url}'")
+
+    try:
+        # --- 1. SHOPPING ---
+        for item in dados.get('shopping', []):
+            nome = item.get('nome').lower().strip()
+            cat_nome = item.get('cat', 'OUTROS').upper()
+            
+            cat = Categoria.query.filter_by(nome=cat_nome).first()
+            if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
+            
+            prod = Produto.query.filter_by(nome=nome).first()
+            if not prod:
+                prod = Produto(nome=nome, categoria_id=cat.id)
+                db.session.add(prod); db.session.flush()
+            
+            existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
+            if not existe:
+                db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
+                logs_acao.append(f"🛒 {nome.title()}")
+
+        # --- 2. TASKS ---
+        for task in dados.get('tasks', []):
+            t = Task(
+                descricao=task.get('desc'),
+                responsavel=task.get('resp', 'Casal').capitalize(),
+                prioridade=int(task.get('prio', 1)),
+                status='pendente'
+            )
+            db.session.add(t)
+            logs_acao.append(f"✅ {t.responsavel}: {t.descricao}")
+
+        # --- 3. REMINDERS (COM SYNC IMEDIATO + TIMEZONE FIX + VISUAL NOVO) ---
+        for rem in dados.get('reminders', []):
+            title = rem.get('title')
+            date_str = rem.get('date')
+            time_str = rem.get('time')
+            
+            # Correção Automática: Se tem hora mas não tem data, assume HOJE
+            if not date_str and time_str:
+                date_str = data_hoje_iso
+                logger.info(f"📅 Data assumida como HOJE para: {title}")
+
+            if title and date_str:
+                try:
+                    # Parse da Data
+                    due_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                    
+                    # Lógica de Horário + Título Google
+                    if time_str:
+                        due_time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
+                        full_dt = datetime.datetime.combine(due_date_obj, due_time_obj)
+                        
+                        # [FIX] Fuso Horário Brasil (-03:00) explícito
+                        iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
+                        title_for_google = f"{title} [{time_str}]"
+                    else:
+                        full_dt = datetime.datetime.combine(due_date_obj, datetime.time.min)
+                        iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
+                        title_for_google = title
+
+                    logger.info(f"⏰ Processando: {title} | ISO BR: {iso_google}")
+                    
+                    # Salva no Banco Local
+                    novo_rem = Reminder(
+                        title=title, 
+                        notes=rem.get('notes', ''),
+                        due_date=full_dt,
+                        status='needsAction',
+                        usuario=usuario
+                    )
+                    db.session.add(novo_rem)
+                    
+                    # COMMIT ANTECIPADO (Para o ID existir quando o N8N bater)
+                    db.session.commit()  
+                    local_id = novo_rem.id 
+                    
+                    # --- FORMATAÇÃO DA MENSAGEM (NOVO) ---
+                    display_date = full_dt.strftime('%d/%m')
+                    display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
+                    
+                    msg_formatada = (
+                        f"🔔 **Lembrete:**\n"
+                        f"Nome: {title}\n"
+                        f"Data: {display_date}\n"
+                        f"Horário: {display_time}"
+                    )
+                    logs_acao.append(msg_formatada)
+
+                    # --- DISPARO IMEDIATO PARA O N8N ---
+                    if webhook_create_url and iso_google:
+                        logger.info(f"🚀 Enviando para N8N (ID Local: {local_id})...")
+                        try:
+                            payload = {
+                                "action": "create",
+                                "local_id": local_id,
+                                "title": title_for_google,
+                                "notes": rem.get('notes', ''),
+                                "due": iso_google
+                            }
+                            # Timeout de 3s
+                            resp_n8n = requests.post(webhook_create_url, json=payload, timeout=3)
+                            logger.info(f"📡 Resposta N8N: {resp_n8n.status_code}")
+                        except Exception as w_err:
+                            logger.warning(f"⚠️ Falha no Sync Imediato: {w_err}")
+                    else:
+                        reason = "Sem URL N8N" if not webhook_create_url else "Sem Data Válida"
+                        logger.warning(f"⚠️ Webhook PULADO: {reason}")
+                
+                except Exception as e_rem:
+                     logger.error(f"❌ Erro ao processar lembrete individual: {e_rem}")
+
+        db.session.commit()
+        
+        msg_final = "\n".join(logs_acao) if logs_acao else "Nenhuma ação identificada."
+        return jsonify({'message': msg_final}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro Geral Omni: {traceback.format_exc()}")
+        return jsonify({'erro': str(e)}), 500
+    
+    
 def tasks_magic():
+    current_context = f"Hoje é {datetime.now().strftime('%A, %d de %B de %Y, às %H:%M')}."
     # 1. Configura IA
     try:
         model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
@@ -660,27 +839,90 @@ def update_reminder():
     try:
         webhook_url = os.getenv('N8N_WEBHOOK_TASKS') # Pega do .env
         
-        if webhook_url and reminder.google_id:
+        if webhook_url and (reminder.google_id or reminder.calendar_id):
             payload = {
                 "action": "update",
+                "local_id": reminder.id, # Bom enviar sempre
                 "google_id": reminder.google_id,
+                "calendar_id": reminder.calendar_id, # <--- NOVO: Envia o ID do evento
                 "title": reminder.title,
                 "notes": reminder.notes
             }
             
-            # Agora a variável existe!
             if iso_date_for_google:
                 payload["due"] = iso_date_for_google
             
-            # Envia para o n8n
             logger.info(f"🚀 Enviando update para n8n: {payload}")
             requests.post(webhook_url, json=payload, timeout=2)
             
     except Exception as e:
         logger.error(f"❌ Erro no envio para n8n: {e}")
-        # Não retorna erro para o usuário pois salvou localmente
 
     return jsonify({'status': 'success'})
+
+# --- NOVO: Rota para Criar Lembrete Manualmente ou via IA ---
+@app.route('/reminders/create', methods=['POST'])
+def create_reminder():
+    d = request.get_json()
+    if not d: return jsonify({'erro': 'JSON invalido'}), 400
+
+    title = d.get('title')
+    notes = d.get('notes', '')
+    date_str = d.get('date') # Espera formato YYYY-MM-DD
+    time_str = d.get('time') # Espera formato HH:MM
+    
+    # Tratamento da Data
+    dt_final = None
+    iso_google = None
+    
+    if date_str:
+        try:
+            if time_str:
+                dt_final = datetime.datetime.fromisoformat(f"{date_str}T{time_str}:00")
+                # Formato RFC3339 para Google
+                iso_google = f"{date_str}T{time_str}:00.000Z"
+            else:
+                dt_final = datetime.datetime.fromisoformat(f"{date_str}T00:00:00")
+                iso_google = f"{date_str}T00:00:00.000Z"
+        except ValueError:
+            pass # Se falhar, cria sem data (apenas lista)
+
+    try:
+        # 1. Salva no Banco Local (sem Google ID ainda)
+        novo_lembrete = Reminder(
+            title=title,
+            notes=notes,
+            due_date=dt_final,
+            status='needsAction',
+            usuario=d.get('usuario', 'API')
+        )
+        db.session.add(novo_lembrete)
+        db.session.commit()
+
+        # 2. Dispara Webhook para o n8n criar no Google Tasks
+        # O n8n deve criar lá e depois chamar /reminders/sync para atualizar o google_id aqui
+        webhook_url = os.getenv('N8N_WEBHOOK_TASKS') 
+        
+        if webhook_url:
+            payload = {
+                "action": "create",
+                "local_id": novo_lembrete.id, # Enviamos o ID local para rastreio
+                "title": title,
+                "notes": notes,
+                "due": iso_google
+            }
+            # Fire and forget (não travamos a request esperando o Google)
+            try:
+                requests.post(webhook_url, json=payload, timeout=2)
+            except Exception as e:
+                logger.error(f"Erro ao disparar webhook n8n: {e}")
+
+        return jsonify({'status': 'success', 'id': novo_lembrete.id, 'message': f'Lembrete "{title}" criado.'}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro Create Reminder: {traceback.format_exc()}")
+        return jsonify({'erro': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
