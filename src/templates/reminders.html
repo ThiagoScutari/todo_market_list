@@ -94,39 +94,37 @@
 
 {% block extra_js %}
 <script>
-    async function syncGoogle() {
-        const btn = document.querySelector('.btn-clear-large');
-        const originalText = btn.innerHTML;
+    async function forceSync() {
+        const btn = document.getElementById('btn-sync-tasks');
+        const icon = btn.querySelector('i');
         
         // Feedback visual imediato
-        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sincronizando...';
-        btn.style.opacity = "0.7";
-        btn.disabled = true;
-
+        icon.classList.add('fa-spin'); 
+        
         try {
-            // 1. Chama o Backend para iniciar o sync
-            const response = await fetch('/reminders/sync', { 
+            // Chamamos o GATILHO, não o processador
+            const response = await fetch('/reminders/trigger', { 
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: {'Content-Type': 'application/json'}
             });
             
-            const data = await response.json();
-
             if (response.ok) {
-                // 2. Sucesso: Recarrega para mostrar dados novos
-                location.reload();
+                // O N8N foi avisado. Vamos esperar uns 3 segs e recarregar a tela
+                // para dar tempo do N8N processar e devolver os dados para o banco
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000); 
+                
+                // Opcional: Mostrar um Toast/Notificação
+                // alert("Sincronizando com Google...");
             } else {
-                alert('Erro no sync: ' + (data.message || 'Erro desconhecido'));
+                alert("Erro ao solicitar sincronia.");
+                icon.classList.remove('fa-spin');
             }
-
-        } catch (err) {
-            console.error(err);
-            alert('Erro de conexão com o servidor.');
-        } finally {
-            // Restaura o botão se algo falhar e não der reload
-            btn.innerHTML = originalText;
-            btn.style.opacity = "1";
-            btn.disabled = false;
+        } catch (error) {
+            console.error("Erro:", error);
+            alert("Falha na conexão.");
+            icon.classList.remove('fa-spin');
         }
     }
 

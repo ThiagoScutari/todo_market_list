@@ -990,6 +990,50 @@ def create_reminder():
         logger.error(f"Erro Create Reminder: {traceback.format_exc()}")
         return jsonify({'erro': str(e)}), 500
 
+# --- ROTA: GATILHO MANUAL (Acionada pelo Botão do Front) ---
+@app.route('/reminders/trigger', methods=['POST'])
+@login_required
+def trigger_manual_sync():
+    """
+    Aciona o Webhook do N8N para buscar dados do Google Tasks.
+    A URL é carregada do .env para segurança.
+    """
+    # 🔒 Carrega a URL do .env (Segurança)
+    webhook_url = os.getenv('N8N_WEBHOOK_REMINDERS')
+    
+    if not webhook_url:
+        logger.error("❌ Erro: Variável N8N_WEBHOOK_REMINDERS não definida no .env")
+        return jsonify({"status": "error", "message": "Configuração de servidor ausente."}), 500
+
+    try:
+        # Payload informativo (quem solicitou)
+        payload = {
+            "trigger": "manual_button",
+            "requested_by": current_user.username
+        }
+        
+        # Fire and Forget com timeout curto
+        try:
+            requests.post(webhook_url, json=payload, timeout=2)
+            logger.info(f"🚀 Trigger de sync disparado por {current_user.username}")
+        except requests.exceptions.ReadTimeout:
+            # Timeout é esperado e aceitável aqui (o N8N pode demorar para responder)
+            pass 
+        except Exception as request_error:
+             logger.error(f"⚠️ Erro na conexão com N8N: {request_error}")
+             # Não retornamos erro 500 aqui para não assustar o usuário se o N8N estiver apenas lento
+            
+        return jsonify({
+            "status": "success", 
+            "message": "Sincronização solicitada!"
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Erro crítico no trigger: {e}")
+        return jsonify({"status": "error", "message": "Erro interno."}), 500
+    
+
+
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)

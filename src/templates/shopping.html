@@ -32,7 +32,15 @@
                  data-id="{{ item.id }}">
                 
                 <div class="product-info">
-                    <div class="product-name"><span class="emoji">{{ item.emoji }}</span> {{ item.nome }}</div>
+                    <div class="product-name">
+                        <span class="item-name">
+                            {{ item.emoji or '' }} {{ item.nome }}
+                        </span>
+
+                        <span class="item-name">
+                            {{ item.emoji if item.emoji else '📦' }} {{ item.nome }}
+                        </span>
+                    </div>
                     <div class="product-meta">
                         {{ item.detalhes }} • <i class="bi bi-person-fill"></i> {{ item.usuario }}
                     </div>
