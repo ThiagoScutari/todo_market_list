@@ -430,28 +430,29 @@ def voice_process():
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
     data_hoje_iso = agora.strftime("%Y-%m-%d")
 
-    # --- 1. Configuração da IA (Blindada) ---
+    # --- 1. Configuração da IA (Com pedido de EMOJI) ---
     try:
-        # Configuração com Fail Fast (Falha Rápida)
         model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash", 
             temperature=0.0,
-            max_retries=0,   # IMPORTANTE: 0 retries para evitar travar o Gunicorn
-            timeout=10       # IMPORTANTE: Desiste após 10s
+            max_retries=0,
+            timeout=10
         )
         
+        # AQUI FOI A MUDANÇA NO PROMPT: Adicionei "emoji" no JSON e nas Regras
         template_str = """
         Você é o FamilyOS. Data atual: {data_atual}.
         Analise o texto e extraia JSON:
         {{
-            "shopping": [ {{ "nome": "item", "qty": 1, "cat": "CATEGORIA" }} ],
+            "shopping": [ {{ "nome": "item", "qty": 1, "cat": "CATEGORIA", "emoji": "🍎" }} ],
             "tasks": [ {{ "desc": "ação", "resp": "Nome", "prio": 1-3 }} ],
             "reminders": [ {{ "title": "título", "date": "YYYY-MM-DD", "time": "HH:MM", "notes": "detalhes" }} ]
         }}
         Regras:
         - Shopping Cats: PADARIA, CARNES, LIMPEZA, HORTIFRÚTI, OUTROS.
+        - Emoji: Escolha um emoji visualmente representativo para cada item de compra.
         - Task Prio: 1(Baixa), 2(Média), 3(Alta). Resp: Thiago, Debora, Casal.
-        - Reminders: Se disser apenas a hora (ex: "às 14h"), assuma a data de HOJE. Se não tiver hora, time=null.
+        - Reminders: Se disser apenas a hora (ex: "às 14h"), assuma a data de HOJE.
         
         Texto: "{texto}"
         """
@@ -459,13 +460,9 @@ def voice_process():
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
         
-        # Chama a IA
         res = chain.invoke({"data_atual": str_agora, "texto": texto_entrada})
         
-        # Limpeza e Parsing (Blindado contra erros de Markdown)
         clean_json = re.sub(r'```json|```', '', res.content).strip()
-        
-        # Validação básica antes do Load
         if not clean_json.startswith('{') and not clean_json.startswith('['):
              raise ValueError("IA não retornou JSON válido")
              
@@ -475,22 +472,16 @@ def voice_process():
     except Exception as e:
         error_msg = str(e)
         logger.error(f"⚠️ Erro IA: {error_msg}")
-        
-        # Tratamento específico para Cota Excedida (Erro 429)
         if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-            return jsonify({
-                "message": "🧠 O cérebro da casa cansou (Cota de IA excedida). Tente em 1 minuto.",
-                "status": "error"
-            }), 429
-        
-        return jsonify({'erro': 'Falha na interpretação da IA. Tente novamente.'}), 500
+            return jsonify({"message": "🧠 Cota de IA excedida. Tente em 1 minuto.", "status": "error"}), 429
+        return jsonify({'erro': 'Falha na interpretação da IA.'}), 500
 
     # --- 2. Processamento dos Dados ---
     logs_acao = []
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
 
     try:
-        # --- A. SHOPPING (Deduplicação + Proteção) ---
+        # --- A. SHOPPING (Com salvamento de Emoji) ---
         shopping_add = []
         shopping_exist = []
 
@@ -502,6 +493,9 @@ def voice_process():
 
                 cat_nome = item.get('cat', 'OUTROS').upper()
                 
+                # AQUI: Pegamos o emoji que a IA sugeriu
+                emoji_ia = item.get('emoji', '📦')
+
                 # Garante categoria
                 cat = Categoria.query.filter_by(nome=cat_nome).first()
                 if not cat: 
@@ -509,10 +503,10 @@ def voice_process():
                     db.session.add(cat)
                     db.session.flush()
                 
-                # Garante produto
+                # Garante produto e salva o EMOJI se for novo
                 prod = Produto.query.filter_by(nome=nome).first()
                 if not prod:
-                    prod = Produto(nome=nome, categoria_id=cat.id)
+                    prod = Produto(nome=nome, categoria_id=cat.id, emoji=emoji_ia)
                     db.session.add(prod)
                     db.session.flush()
                 
@@ -529,7 +523,7 @@ def voice_process():
                         usuario=usuario, 
                         origem_input="omniscient"
                     ))
-                    shopping_add.append(nome.title())
+                    shopping_add.append(f"{emoji_ia} {nome.title()}")
                 else:
                     shopping_exist.append(nome.title())
 
@@ -539,7 +533,7 @@ def voice_process():
         if shopping_exist: msgs_shopping.append(f"⚠️ Já na lista: {', '.join(shopping_exist)}")
         if msgs_shopping: logs_acao.append(" | ".join(msgs_shopping))
 
-        # --- B. TASKS (Deduplicação + Proteção) ---
+        # --- B. TASKS (Mantido Igual) ---
         tasks_add = []
         tasks_exist = []
 
@@ -553,7 +547,6 @@ def voice_process():
                 try: prio = int(task.get('prio', 1))
                 except: prio = 1
 
-                # Verifica duplicidade
                 existe_task = Task.query.filter(
                     Task.descricao.ilike(desc), 
                     Task.responsavel == resp,
@@ -568,9 +561,9 @@ def voice_process():
                     tasks_exist.append(f"{desc}")
 
         if tasks_add: logs_acao.extend(tasks_add)
-        if tasks_exist: logs_acao.append(f"⚠️ Tarefas ignoradas (já existem): {len(tasks_exist)}")
+        if tasks_exist: logs_acao.append(f"⚠️ Tarefas ignoradas: {len(tasks_exist)}")
 
-        # --- C. REMINDERS (Sync com Google via N8N) ---
+        # --- C. REMINDERS (Mantido Igual) ---
         lista_reminders = dados.get('reminders')
         if lista_reminders and isinstance(lista_reminders, list):
             for rem in lista_reminders:
@@ -580,7 +573,6 @@ def voice_process():
                 
                 if not title: continue 
 
-                # Fallback data de hoje se não especificada
                 if not date_str: date_str = data_hoje_iso
 
                 if date_str:
@@ -590,18 +582,15 @@ def voice_process():
                         if time_str:
                             due_time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
                             full_dt = datetime.datetime.combine(due_date_obj, due_time_obj)
-                            # Formato ISO para Google Calendar/Tasks
                             iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
                             title_for_google = f"{title} [{time_str}]" 
                             display_time = time_str
                         else:
-                            # Dia inteiro
                             full_dt = datetime.datetime.combine(due_date_obj, datetime.time.min)
                             iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
                             title_for_google = title
                             display_time = "Dia todo"
 
-                        # Verifica duplicidade no banco local
                         existe_rem = Reminder.query.filter(
                             Reminder.title.ilike(title),
                             Reminder.due_date == full_dt,
@@ -612,7 +601,6 @@ def voice_process():
                             logs_acao.append(f"⚠️ Lembrete já existe: {title}")
                             continue 
 
-                        # Cria no Postgres
                         novo_rem = Reminder(
                             title=title, 
                             notes=rem.get('notes', ''),
@@ -621,13 +609,12 @@ def voice_process():
                             usuario=usuario
                         )
                         db.session.add(novo_rem)
-                        db.session.flush() # Gera ID
+                        db.session.flush()
                         local_id = novo_rem.id 
                         
                         display_date = full_dt.strftime('%d/%m')
                         logs_acao.append(f"🔔 Lembrete agendado: {title} ({display_date} às {display_time})")
 
-                        # Webhook N8N
                         if webhook_create_url:
                             try:
                                 payload = {
@@ -637,7 +624,6 @@ def voice_process():
                                     "notes": rem.get('notes', ''),
                                     "due": iso_google
                                 }
-                                # Timeout curto para não travar o user se o N8N demorar
                                 requests.post(webhook_create_url, json=payload, timeout=2)
                             except Exception as e_webhook:
                                 logger.warning(f"Falha webhook N8N: {e_webhook}")
@@ -654,7 +640,6 @@ def voice_process():
         db.session.rollback()
         logger.error(f"Erro Geral Omni: {traceback.format_exc()}")
         return jsonify({'erro': str(e)}), 500
-        
 def tasks_magic():
     current_context = f"Hoje é {datetime.now().strftime('%A, %d de %B de %Y, às %H:%M')}."
     # 1. Configura IA
