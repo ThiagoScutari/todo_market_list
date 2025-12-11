@@ -305,3 +305,11 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     border-radius: 8px;
     border: 1px solid rgba(34, 255, 122, 0.2);
 }
+.fa-spin {
+    animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
