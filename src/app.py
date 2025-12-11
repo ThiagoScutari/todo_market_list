@@ -421,7 +421,7 @@ def voice_process():
     # Contexto Temporal
     agora = datetime.datetime.now()
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
-    data_hoje_iso = agora.strftime("%Y-%m-%d") # Usado para fallback
+    data_hoje_iso = agora.strftime("%Y-%m-%d")
 
     # 1. Configuração da IA
     try:
@@ -448,11 +448,8 @@ def voice_process():
         
         res = chain.invoke({"data_atual": str_agora, "texto": texto_entrada})
         
-        # Limpeza e Parsing
         clean_json = re.sub(r'```json|```', '', res.content).strip()
         dados = json.loads(clean_json)
-        
-        # LOG DE DEBUG 1: O que a IA entendeu?
         logger.info(f"🤖 RAW JSON IA: {dados}")
 
     except Exception as e:
@@ -460,15 +457,10 @@ def voice_process():
         return jsonify({'erro': 'Falha na interpretação da IA'}), 500
 
     logs_acao = []
-    
-    # Carrega URL e remove espaços extras caso existam no .env
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
-    
-    # LOG DE DEBUG 2: A URL existe?
-    logger.info(f"🔗 URL Webhook carregada: '{webhook_create_url}'")
 
     try:
-        # --- 1. SHOPPING ---
+        # --- 1. SHOPPING (Deduplicação por Nome e Status) ---
         shopping_add = []
         shopping_exist = []
 
@@ -491,49 +483,55 @@ def voice_process():
             else:
                 shopping_exist.append(nome.title())
 
-        # Monta a mensagem de Mercado
+        # Formata Log Shopping
         msgs_shopping = []
-        if shopping_add: 
-            msgs_shopping.append(f"🛒 Adicionados: {', '.join(shopping_add)}")
-        if shopping_exist: 
-            msgs_shopping.append(f"⚠️ Já na lista: {', '.join(shopping_exist)}")
-        
-        if msgs_shopping:
-            logs_acao.append(" | ".join(msgs_shopping))
+        if shopping_add: msgs_shopping.append(f"🛒 Adicionados: {', '.join(shopping_add)}")
+        if shopping_exist: msgs_shopping.append(f"⚠️ Já na lista: {', '.join(shopping_exist)}")
+        if msgs_shopping: logs_acao.append(" | ".join(msgs_shopping))
 
-        # --- 2. TASKS ---
+        # --- 2. TASKS (Deduplicação por Descrição e Responsável) ---
+        tasks_add = []
+        tasks_exist = []
+
         for task in dados.get('tasks', []):
-            t = Task(
-                descricao=task.get('desc'),
-                responsavel=task.get('resp', 'Casal').capitalize(),
-                prioridade=int(task.get('prio', 1)),
-                status='pendente'
-            )
-            db.session.add(t)
-            logs_acao.append(f"✅ **Tarefa: **{t.responsavel}: {t.descricao}")
+            desc = task.get('desc')
+            resp = task.get('resp', 'Casal').capitalize()
+            prio = int(task.get('prio', 1))
 
-        # --- 3. REMINDERS (COM SYNC IMEDIATO + TIMEZONE FIX + VISUAL NOVO) ---
+            # Verifica duplicidade (Case Insensitive na descrição)
+            # Regra: Mesma descrição, mesmo responsável e status pendente
+            existe_task = Task.query.filter(
+                Task.descricao.ilike(desc), 
+                Task.responsavel == resp,
+                Task.status == 'pendente'
+            ).first()
+
+            if not existe_task:
+                t = Task(descricao=desc, responsavel=resp, prioridade=prio, status='pendente')
+                db.session.add(t)
+                tasks_add.append(f"✅ {resp}: {desc}")
+            else:
+                tasks_exist.append(f"⚠️ {resp}: {desc}")
+
+        if tasks_add: logs_acao.extend(tasks_add)
+        if tasks_exist: logs_acao.append(f"Informação: Tarefas ignoradas pois já existem ({len(tasks_exist)})")
+
+        # --- 3. REMINDERS (Deduplicação por Título + Data + Hora Exata) ---
         for rem in dados.get('reminders', []):
             title = rem.get('title')
             date_str = rem.get('date')
             time_str = rem.get('time')
             
-            # Correção Automática: Se tem hora mas não tem data, assume HOJE
             if not date_str and time_str:
                 date_str = data_hoje_iso
-                logger.info(f"📅 Data assumida como HOJE para: {title}")
 
             if title and date_str:
                 try:
-                    # Parse da Data
+                    # Monta Data Final
                     due_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-                    
-                    # Lógica de Horário + Título Google
                     if time_str:
                         due_time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
                         full_dt = datetime.datetime.combine(due_date_obj, due_time_obj)
-                        
-                        # [FIX] Fuso Horário Brasil (-03:00) explícito
                         iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
                         title_for_google = f"{title} [{time_str}]"
                     else:
@@ -541,9 +539,21 @@ def voice_process():
                         iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
                         title_for_google = title
 
-                    logger.info(f"⏰ Processando: {title} | ISO BR: {iso_google}")
-                    
-                    # Salva no Banco Local
+                    # --- VERIFICAÇÃO DE DUPLICIDADE ---
+                    # Busca lembrete com mesmo título E mesma data/hora exata que não esteja completado
+                    existe_rem = Reminder.query.filter(
+                        Reminder.title.ilike(title),
+                        Reminder.due_date == full_dt,
+                        Reminder.status != 'completed'
+                    ).first()
+
+                    if existe_rem:
+                        # Se já existe, apenas avisa e NÃO cria, NÃO chama n8n
+                        display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
+                        logs_acao.append(f"⚠️ Já agendado: {title} às {display_time}")
+                        continue # Pula para o próximo loop
+
+                    # Se não existe, cria novo
                     novo_rem = Reminder(
                         title=title, 
                         notes=rem.get('notes', ''),
@@ -552,26 +562,23 @@ def voice_process():
                         usuario=usuario
                     )
                     db.session.add(novo_rem)
-                    
-                    # COMMIT ANTECIPADO (Para o ID existir quando o N8N bater)
-                    db.session.commit()  
+                    db.session.commit() # Commit para gerar ID
                     local_id = novo_rem.id 
                     
-                    # --- FORMATAÇÃO DA MENSAGEM (NOVO) ---
+                    # Formatação Visual
                     display_date = full_dt.strftime('%d/%m')
                     display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
                     
                     msg_formatada = (
                         f"🔔 **Lembrete:**\n"
-                        f"Título: {title}\n"
+                        f"Nome: {title}\n"
                         f"Data: {display_date}\n"
                         f"Horário: {display_time}"
                     )
                     logs_acao.append(msg_formatada)
 
-                    # --- DISPARO IMEDIATO PARA O N8N ---
+                    # Disparo N8N (Apenas se for novo)
                     if webhook_create_url and iso_google:
-                        logger.info(f"🚀 Enviando para N8N (ID Local: {local_id})...")
                         try:
                             payload = {
                                 "action": "create",
@@ -580,21 +587,16 @@ def voice_process():
                                 "notes": rem.get('notes', ''),
                                 "due": iso_google
                             }
-                            # Timeout de 3s
-                            resp_n8n = requests.post(webhook_create_url, json=payload, timeout=3)
-                            logger.info(f"📡 Resposta N8N: {resp_n8n.status_code}")
-                        except Exception as w_err:
-                            logger.warning(f"⚠️ Falha no Sync Imediato: {w_err}")
-                    else:
-                        reason = "Sem URL N8N" if not webhook_create_url else "Sem Data Válida"
-                        logger.warning(f"⚠️ Webhook PULADO: {reason}")
+                            requests.post(webhook_create_url, json=payload, timeout=3)
+                        except Exception:
+                            pass 
                 
                 except Exception as e_rem:
-                     logger.error(f"❌ Erro ao processar lembrete individual: {e_rem}")
+                     logger.error(f"❌ Erro reminder: {e_rem}")
 
         db.session.commit()
         
-        msg_final = "\n".join(logs_acao) if logs_acao else "Nenhuma ação identificada."
+        msg_final = "\n".join(logs_acao) if logs_acao else "Nenhuma ação nova identificada."
         return jsonify({'message': msg_final}), 201
 
     except Exception as e:
