@@ -341,7 +341,7 @@ def magic():
     # --- MODELO GEMINI PRO ---
     try:
         model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash"
+            model="gemini-2.5-flash", # correção comma
             temperature=0.0,
             max_retries=1,
             timeout=10

@@ -94,11 +94,24 @@
 
 {% block extra_js %}
 <script>
-    function syncGoogle() {
+    async function syncGoogle() {
         const btn = document.querySelector('.btn-clear-large');
+        const originalText = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sincronizando...';
-        // Simula reload (o sync real é backend)
-        setTimeout(() => location.reload(), 1500);
+        btn.disabled = true;
+
+        try {
+            // Chama a rota que o n8n estava chamando, mas agora sob demanda
+            await fetch('/reminders/sync', { method: 'POST' });
+            location.reload(); // Recarrega para mostrar os novos dados
+        } catch (error) {
+            console.error('Erro no sync:', error);
+            btn.innerHTML = 'Erro ao Sincronizar';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 2000);
+        }
     }
 
     // --- LONG PRESS EDIT ---
