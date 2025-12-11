@@ -300,7 +300,6 @@ def clear_tasks():
     return jsonify({'status': 'success'})
 
 # --- API ENDPOINTS (MERCADO) ---
-
 @app.route('/toggle_item/<int:id>', methods=['POST'])
 @login_required
 def toggle(id):
@@ -470,6 +469,9 @@ def voice_process():
 
     try:
         # --- 1. SHOPPING ---
+        shopping_add = []
+        shopping_exist = []
+
         for item in dados.get('shopping', []):
             nome = item.get('nome').lower().strip()
             cat_nome = item.get('cat', 'OUTROS').upper()
@@ -485,7 +487,19 @@ def voice_process():
             existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
             if not existe:
                 db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
-                logs_acao.append(f"🛒 {nome.title()}")
+                shopping_add.append(nome.title())
+            else:
+                shopping_exist.append(nome.title())
+
+        # Monta a mensagem de Mercado
+        msgs_shopping = []
+        if shopping_add: 
+            msgs_shopping.append(f"🛒 Adicionados: {', '.join(shopping_add)}")
+        if shopping_exist: 
+            msgs_shopping.append(f"⚠️ Já na lista: {', '.join(shopping_exist)}")
+        
+        if msgs_shopping:
+            logs_acao.append(" | ".join(msgs_shopping))
 
         # --- 2. TASKS ---
         for task in dados.get('tasks', []):
@@ -496,7 +510,7 @@ def voice_process():
                 status='pendente'
             )
             db.session.add(t)
-            logs_acao.append(f"✅ {t.responsavel}: {t.descricao}")
+            logs_acao.append(f"✅ **Tarefa: **{t.responsavel}: {t.descricao}")
 
         # --- 3. REMINDERS (COM SYNC IMEDIATO + TIMEZONE FIX + VISUAL NOVO) ---
         for rem in dados.get('reminders', []):
@@ -549,7 +563,7 @@ def voice_process():
                     
                     msg_formatada = (
                         f"🔔 **Lembrete:**\n"
-                        f"Nome: {title}\n"
+                        f"Título: {title}\n"
                         f"Data: {display_date}\n"
                         f"Horário: {display_time}"
                     )
