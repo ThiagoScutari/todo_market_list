@@ -412,6 +412,8 @@ def toggle_task(id):
 @app.route('/voice/process', methods=['POST'])
 def voice_process():
     d = request.get_json()
+    if not d: return jsonify({'erro': 'JSON invalido'}), 400
+    
     texto_entrada = d.get('texto', '')
     usuario = d.get('usuario', 'Voz')
 
@@ -448,7 +450,12 @@ def voice_process():
         
         res = chain.invoke({"data_atual": str_agora, "texto": texto_entrada})
         
+        # Limpeza e Parsing (Blindado contra erros de Markdown)
         clean_json = re.sub(r'```json|```', '', res.content).strip()
+        # Se a IA devolver vazio ou texto puro, evitamos crash
+        if not clean_json.startswith('{') and not clean_json.startswith('['):
+             raise ValueError("IA não retornou JSON válido")
+             
         dados = json.loads(clean_json)
         logger.info(f"🤖 RAW JSON IA: {dados}")
 
@@ -460,28 +467,34 @@ def voice_process():
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
 
     try:
-        # --- 1. SHOPPING (Deduplicação por Nome e Status) ---
+        # --- 1. SHOPPING (Deduplicação + Proteção contra Null) ---
         shopping_add = []
         shopping_exist = []
 
-        for item in dados.get('shopping', []):
-            nome = item.get('nome').lower().strip()
-            cat_nome = item.get('cat', 'OUTROS').upper()
-            
-            cat = Categoria.query.filter_by(nome=cat_nome).first()
-            if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
-            
-            prod = Produto.query.filter_by(nome=nome).first()
-            if not prod:
-                prod = Produto(nome=nome, categoria_id=cat.id)
-                db.session.add(prod); db.session.flush()
-            
-            existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
-            if not existe:
-                db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
-                shopping_add.append(nome.title())
-            else:
-                shopping_exist.append(nome.title())
+        # Garante que 'shopping' seja uma lista, mesmo se vier None
+        lista_compras = dados.get('shopping')
+        if lista_compras and isinstance(lista_compras, list):
+            for item in lista_compras:
+                # Proteção: usa string vazia '' como default para não quebrar o .lower()
+                nome = item.get('nome', '').lower().strip()
+                if not nome: continue # Pula se não tiver nome
+
+                cat_nome = item.get('cat', 'OUTROS').upper()
+                
+                cat = Categoria.query.filter_by(nome=cat_nome).first()
+                if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
+                
+                prod = Produto.query.filter_by(nome=nome).first()
+                if not prod:
+                    prod = Produto(nome=nome, categoria_id=cat.id)
+                    db.session.add(prod); db.session.flush()
+                
+                existe = ListaItem.query.filter(ListaItem.produto_id==prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
+                if not existe:
+                    db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
+                    shopping_add.append(nome.title())
+                else:
+                    shopping_exist.append(nome.title())
 
         # Formata Log Shopping
         msgs_shopping = []
@@ -489,110 +502,118 @@ def voice_process():
         if shopping_exist: msgs_shopping.append(f"⚠️ Já na lista: {', '.join(shopping_exist)}")
         if msgs_shopping: logs_acao.append(" | ".join(msgs_shopping))
 
-        # --- 2. TASKS (Deduplicação por Descrição e Responsável) ---
+        # --- 2. TASKS (Deduplicação + Proteção) ---
         tasks_add = []
         tasks_exist = []
 
-        for task in dados.get('tasks', []):
-            desc = task.get('desc')
-            resp = task.get('resp', 'Casal').capitalize()
-            prio = int(task.get('prio', 1))
+        lista_tarefas = dados.get('tasks')
+        if lista_tarefas and isinstance(lista_tarefas, list):
+            for task in lista_tarefas:
+                desc = task.get('desc', '').strip()
+                if not desc: continue # Pula sem descrição
 
-            # Verifica duplicidade (Case Insensitive na descrição)
-            # Regra: Mesma descrição, mesmo responsável e status pendente
-            existe_task = Task.query.filter(
-                Task.descricao.ilike(desc), 
-                Task.responsavel == resp,
-                Task.status == 'pendente'
-            ).first()
+                resp = task.get('resp', 'Casal').capitalize()
+                try:
+                    prio = int(task.get('prio', 1))
+                except:
+                    prio = 1
 
-            if not existe_task:
-                t = Task(descricao=desc, responsavel=resp, prioridade=prio, status='pendente')
-                db.session.add(t)
-                tasks_add.append(f"✅ {resp}: {desc}")
-            else:
-                tasks_exist.append(f"⚠️ {resp}: {desc}")
+                # Verifica duplicidade
+                existe_task = Task.query.filter(
+                    Task.descricao.ilike(desc), 
+                    Task.responsavel == resp,
+                    Task.status == 'pendente'
+                ).first()
+
+                if not existe_task:
+                    t = Task(descricao=desc, responsavel=resp, prioridade=prio, status='pendente')
+                    db.session.add(t)
+                    tasks_add.append(f"✅ {resp}: {desc}")
+                else:
+                    tasks_exist.append(f"⚠️ {resp}: {desc}")
 
         if tasks_add: logs_acao.extend(tasks_add)
-        if tasks_exist: logs_acao.append(f"Informação: Tarefas ignoradas pois já existem ({len(tasks_exist)})")
+        if tasks_exist: logs_acao.append(f"Tarefas já existentes ignoradas: {len(tasks_exist)}")
 
-        # --- 3. REMINDERS (Deduplicação por Título + Data + Hora Exata) ---
-        for rem in dados.get('reminders', []):
-            title = rem.get('title')
-            date_str = rem.get('date')
-            time_str = rem.get('time')
-            
-            if not date_str and time_str:
-                date_str = data_hoje_iso
-
-            if title and date_str:
-                try:
-                    # Monta Data Final
-                    due_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-                    if time_str:
-                        due_time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
-                        full_dt = datetime.datetime.combine(due_date_obj, due_time_obj)
-                        iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
-                        title_for_google = f"{title} [{time_str}]"
-                    else:
-                        full_dt = datetime.datetime.combine(due_date_obj, datetime.time.min)
-                        iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
-                        title_for_google = title
-
-                    # --- VERIFICAÇÃO DE DUPLICIDADE ---
-                    # Busca lembrete com mesmo título E mesma data/hora exata que não esteja completado
-                    existe_rem = Reminder.query.filter(
-                        Reminder.title.ilike(title),
-                        Reminder.due_date == full_dt,
-                        Reminder.status != 'completed'
-                    ).first()
-
-                    if existe_rem:
-                        # Se já existe, apenas avisa e NÃO cria, NÃO chama n8n
-                        display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
-                        logs_acao.append(f"⚠️ Já agendado: {title} às {display_time}")
-                        continue # Pula para o próximo loop
-
-                    # Se não existe, cria novo
-                    novo_rem = Reminder(
-                        title=title, 
-                        notes=rem.get('notes', ''),
-                        due_date=full_dt,
-                        status='needsAction',
-                        usuario=usuario
-                    )
-                    db.session.add(novo_rem)
-                    db.session.commit() # Commit para gerar ID
-                    local_id = novo_rem.id 
-                    
-                    # Formatação Visual
-                    display_date = full_dt.strftime('%d/%m')
-                    display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
-                    
-                    msg_formatada = (
-                        f"🔔 **Lembrete:**\n"
-                        f"Nome: {title}\n"
-                        f"Data: {display_date}\n"
-                        f"Horário: {display_time}"
-                    )
-                    logs_acao.append(msg_formatada)
-
-                    # Disparo N8N (Apenas se for novo)
-                    if webhook_create_url and iso_google:
-                        try:
-                            payload = {
-                                "action": "create",
-                                "local_id": local_id,
-                                "title": title_for_google,
-                                "notes": rem.get('notes', ''),
-                                "due": iso_google
-                            }
-                            requests.post(webhook_create_url, json=payload, timeout=3)
-                        except Exception:
-                            pass 
+        # --- 3. REMINDERS (Deduplicação + Proteção) ---
+        lista_reminders = dados.get('reminders')
+        if lista_reminders and isinstance(lista_reminders, list):
+            for rem in lista_reminders:
+                title = rem.get('title', '').strip()
+                date_str = rem.get('date')
+                time_str = rem.get('time')
                 
-                except Exception as e_rem:
-                     logger.error(f"❌ Erro reminder: {e_rem}")
+                if not title: continue # Pula sem título
+
+                if not date_str and time_str:
+                    date_str = data_hoje_iso
+
+                if date_str:
+                    try:
+                        # Monta Data Final
+                        due_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                        if time_str:
+                            due_time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
+                            full_dt = datetime.datetime.combine(due_date_obj, due_time_obj)
+                            iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
+                            title_for_google = f"{title} [{time_str}]"
+                        else:
+                            full_dt = datetime.datetime.combine(due_date_obj, datetime.time.min)
+                            iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
+                            title_for_google = title
+
+                        # --- VERIFICAÇÃO DE DUPLICIDADE ---
+                        existe_rem = Reminder.query.filter(
+                            Reminder.title.ilike(title),
+                            Reminder.due_date == full_dt,
+                            Reminder.status != 'completed'
+                        ).first()
+
+                        if existe_rem:
+                            display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
+                            logs_acao.append(f"⚠️ Já agendado: {title} às {display_time}")
+                            continue 
+
+                        # Cria novo
+                        novo_rem = Reminder(
+                            title=title, 
+                            notes=rem.get('notes', ''),
+                            due_date=full_dt,
+                            status='needsAction',
+                            usuario=usuario
+                        )
+                        db.session.add(novo_rem)
+                        db.session.commit() # Commit para gerar ID
+                        local_id = novo_rem.id 
+                        
+                        # Formatação Visual
+                        display_date = full_dt.strftime('%d/%m')
+                        display_time = full_dt.strftime('%H:%M') if time_str else "Dia todo"
+                        
+                        msg_formatada = (
+                            f"🔔 **Lembrete:**\n"
+                            f"Nome: {title}\n"
+                            f"Data: {display_date}\n"
+                            f"Horário: {display_time}"
+                        )
+                        logs_acao.append(msg_formatada)
+
+                        # Disparo N8N (Apenas se for novo)
+                        if webhook_create_url and iso_google:
+                            try:
+                                payload = {
+                                    "action": "create",
+                                    "local_id": local_id,
+                                    "title": title_for_google,
+                                    "notes": rem.get('notes', ''),
+                                    "due": iso_google
+                                }
+                                requests.post(webhook_create_url, json=payload, timeout=3)
+                            except Exception:
+                                pass 
+                    
+                    except Exception as e_rem:
+                        logger.error(f"❌ Erro reminder: {e_rem}")
 
         db.session.commit()
         
