@@ -97,20 +97,36 @@
     async function syncGoogle() {
         const btn = document.querySelector('.btn-clear-large');
         const originalText = btn.innerHTML;
+        
+        // Feedback visual imediato
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sincronizando...';
+        btn.style.opacity = "0.7";
         btn.disabled = true;
 
         try {
-            // Chama a rota que o n8n estava chamando, mas agora sob demanda
-            await fetch('/reminders/sync', { method: 'POST' });
-            location.reload(); // Recarrega para mostrar os novos dados
-        } catch (error) {
-            console.error('Erro no sync:', error);
-            btn.innerHTML = 'Erro ao Sincronizar';
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }, 2000);
+            // 1. Chama o Backend para iniciar o sync
+            const response = await fetch('/reminders/sync', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const data = await response.json();
+
+            if (response.ok) {
+                // 2. Sucesso: Recarrega para mostrar dados novos
+                location.reload();
+            } else {
+                alert('Erro no sync: ' + (data.message || 'Erro desconhecido'));
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert('Erro de conexão com o servidor.');
+        } finally {
+            // Restaura o botão se algo falhar e não der reload
+            btn.innerHTML = originalText;
+            btn.style.opacity = "1";
+            btn.disabled = false;
         }
     }
 

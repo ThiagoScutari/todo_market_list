@@ -592,7 +592,7 @@ def voice_process():
                             full_dt = datetime.datetime.combine(due_date_obj, due_time_obj)
                             # Formato ISO para Google Calendar/Tasks
                             iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
-                            title_for_google = title # O Google Tasks já tem campo de hora, não precisa por no titulo
+                            title_for_google = f"{title} [{time_str}]" 
                             display_time = time_str
                         else:
                             # Dia inteiro
