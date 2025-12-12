@@ -801,43 +801,60 @@ def update_task():
 # --- ROTA DE SINCRONIZAÇÃO DE LEMBRETES (v2.2 - Com Deletar) ---
 @app.route('/reminders/sync', methods=['POST'])
 def sync_reminders():
-    dados = request.get_json()
-
-    # Garante que seja uma lista
-    if isinstance(dados, dict): dados = [dados]
-
+    raw_data = request.get_json()
+    
+    # 1. TRATAMENTO DE ESTRUTURA (DESEMBRULHAR)
+    # Se receber { "dados_agrupados": [...] }, extrai a lista.
+    dados = []
+    if isinstance(raw_data, dict):
+        if 'dados_agrupados' in raw_data:
+            dados = raw_data['dados_agrupados']
+        else:
+            dados = [raw_data] # É um item único
+    elif isinstance(raw_data, list):
+        dados = raw_data
+    
     usuario_padrao = request.args.get('usuario', 'Google')
 
     count_criado = 0
     count_atualizado = 0
     count_deletado = 0
+    count_ignorados = 0
 
     try:
         for item in dados:
-            gid = item.get('google_id')
-            if not gid: continue
+            # 2. TRATAMENTO DE CHAVES (HÍBRIDO)
+            # Aceita tanto 'google_id' (nosso padrão antigo) quanto 'id' (padrão Google Raw)
+            gid = item.get('google_id') or item.get('id')
+            
+            if not gid:
+                count_ignorados += 1
+                continue
 
             # Busca no banco local
             lembrete = Reminder.query.filter_by(google_id=gid).first()
 
             # --- LÓGICA DE DELEÇÃO ---
-            # Se o Google diz que deletou ("deleted": true), nós removemos do banco
+            # O Google manda 'deleted': True (booleano) ou string dependendo da API
             is_deleted = item.get('deleted')
-            # O json do n8n pode vir como booleano True ou string "true" dependendo da versão
-            if is_deleted is True or str(is_deleted).lower() == 'true':
+            # Verifica se é True booleano ou string "true"
+            should_delete = (is_deleted is True) or (str(is_deleted).lower() == 'true')
+            
+            if should_delete:
                 if lembrete:
                     db.session.delete(lembrete)
                     count_deletado += 1
-                continue # Pula para o próximo, não faz update nem create
+                continue 
 
-            # --- LÓGICA DE CRIAÇÃO/ATUALIZAÇÃO (Mantida) ---
+            # --- LÓGICA DE CRIAÇÃO/ATUALIZAÇÃO ---
 
             # Tratamento de Data
             data_vencimento = None
-            if item.get('due'):
+            due_str = item.get('due')
+            if due_str:
                 try:
-                    # Remove o Z final se existir para compatibilidade
-                    iso_date = item.get('due').replace('Z', '')
+                    # Remove o Z final se existir
+                    iso_date = due_str.replace('Z', '')
                     data_vencimento = datetime.datetime.fromisoformat(iso_date)
                 except:
                     pass
@@ -856,10 +873,15 @@ def sync_reminders():
             lembrete.parent_id = item.get('parent')
             lembrete.due_date = data_vencimento
             lembrete.webViewLink = item.get('webViewLink')
-            lembrete.usuario = usuario_padrao
+            # Só sobrescreve usuário se for criação nova, para manter histórico
+            if count_criado > 0: 
+                lembrete.usuario = usuario_padrao
+            
             lembrete.last_updated = datetime.datetime.utcnow()
 
         db.session.commit()
+
+        logger.info(f"🔄 Sync Resumo: +{count_criado}, ~{count_atualizado}, -{count_deletado}, ignorados: {count_ignorados}")
 
         return jsonify({
             "status": "success",
