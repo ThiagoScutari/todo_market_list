@@ -803,19 +803,37 @@ def update_task():
 def sync_reminders():
     raw_data = request.get_json()
     
-    # 1. TRATAMENTO DE ESTRUTURA (DESEMBRULHAR)
-    # Se receber { "dados_agrupados": [...] }, extrai a lista.
-    dados = []
-    if isinstance(raw_data, dict):
-        if 'dados_agrupados' in raw_data:
-            dados = raw_data['dados_agrupados']
-        else:
-            dados = [raw_data] # É um item único
-    elif isinstance(raw_data, list):
-        dados = raw_data
-    
-    usuario_padrao = request.args.get('usuario', 'Google')
+    # Debug: Vamos ver a cara do inimigo se der erro de novo
+    # logger.info(f"📦 Payload Recebido: {str(raw_data)[:200]}...") 
 
+    dados = []
+
+    # --- 1. LÓGICA DE DESEMBRULHO ROBUSTA ---
+    try:
+        # Cenário A: Chegou uma Lista (ex: [{"dados_agrupados": [...]}])
+        if isinstance(raw_data, list):
+            # Se o primeiro item é o wrapper do n8n
+            if len(raw_data) > 0 and isinstance(raw_data[0], dict) and 'dados_agrupados' in raw_data[0]:
+                dados = raw_data[0]['dados_agrupados']
+            else:
+                # É uma lista pura de tarefas
+                dados = raw_data
+        
+        # Cenário B: Chegou um Dicionário (ex: {"dados_agrupados": [...]})
+        elif isinstance(raw_data, dict):
+            if 'dados_agrupados' in raw_data:
+                dados = raw_data['dados_agrupados']
+            else:
+                # É uma tarefa única
+                dados = [raw_data]
+    except Exception as e:
+        logger.error(f"Erro no parsing do JSON: {e}")
+        return jsonify({"erro": "Formato de JSON inválido"}), 400
+
+    # Garante que dados seja iterável
+    if not dados: dados = []
+
+    usuario_padrao = request.args.get('usuario', 'Google')
     count_criado = 0
     count_atualizado = 0
     count_deletado = 0
@@ -823,21 +841,19 @@ def sync_reminders():
 
     try:
         for item in dados:
+            if not isinstance(item, dict): continue
+
             # 2. TRATAMENTO DE CHAVES (HÍBRIDO)
-            # Aceita tanto 'google_id' (nosso padrão antigo) quanto 'id' (padrão Google Raw)
             gid = item.get('google_id') or item.get('id')
             
             if not gid:
                 count_ignorados += 1
                 continue
 
-            # Busca no banco local
             lembrete = Reminder.query.filter_by(google_id=gid).first()
 
             # --- LÓGICA DE DELEÇÃO ---
-            # O Google manda 'deleted': True (booleano) ou string dependendo da API
             is_deleted = item.get('deleted')
-            # Verifica se é True booleano ou string "true"
             should_delete = (is_deleted is True) or (str(is_deleted).lower() == 'true')
             
             if should_delete:
@@ -847,13 +863,10 @@ def sync_reminders():
                 continue 
 
             # --- LÓGICA DE CRIAÇÃO/ATUALIZAÇÃO ---
-
-            # Tratamento de Data
             data_vencimento = None
             due_str = item.get('due')
             if due_str:
                 try:
-                    # Remove o Z final se existir
                     iso_date = due_str.replace('Z', '')
                     data_vencimento = datetime.datetime.fromisoformat(iso_date)
                 except:
@@ -866,14 +879,13 @@ def sync_reminders():
             else:
                 count_atualizado += 1
 
-            # Atualiza campos
             lembrete.title = item.get('title', 'Sem Título')
             lembrete.notes = item.get('notes')
             lembrete.status = item.get('status')
             lembrete.parent_id = item.get('parent')
             lembrete.due_date = data_vencimento
             lembrete.webViewLink = item.get('webViewLink')
-            # Só sobrescreve usuário se for criação nova, para manter histórico
+            
             if count_criado > 0: 
                 lembrete.usuario = usuario_padrao
             
@@ -887,8 +899,14 @@ def sync_reminders():
             "status": "success",
             "criados": count_criado,
             "atualizados": count_atualizado,
-            "deletados": count_deletado
+            "deletados": count_deletado,
+            "ignorados": count_ignorados
         }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro Sync Lembretes: {traceback.format_exc()}")
+        return jsonify({"erro": str(e)}), 500
 
     except Exception as e:
         db.session.rollback()
