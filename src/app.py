@@ -420,7 +420,8 @@ def voice_process():
     if not d: return jsonify({'erro': 'JSON invalido'}), 400
     
     texto_entrada = d.get('texto', '')
-    usuario = d.get('usuario', 'Voz')
+    # Garante que temos um nome válido, senão usa 'Casal' como fallback seguro
+    usuario = d.get('usuario', 'Casal') 
 
     if not texto_entrada:
         return jsonify({'erro': 'Texto vazio'}), 400
@@ -430,37 +431,59 @@ def voice_process():
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
     data_hoje_iso = agora.strftime("%Y-%m-%d")
 
-    # --- 1. Configuração da IA (Com pedido de EMOJI) ---
+    # --- 1. Configuração da IA ---
     try:
         model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash", 
-            temperature=0.0,
+            temperature=0.0, # Zero criatividade para garantir obediência às regras
             max_retries=0,
             timeout=10
         )
         
-        # AQUI FOI A MUDANÇA NO PROMPT: Adicionei "emoji" no JSON e nas Regras
+        # MUDANÇA CRÍTICA AQUI: Injeção do Contexto de Usuário
         template_str = """
-        Você é o FamilyOS. Data atual: {data_atual}.
-        Analise o texto e extraia JSON:
+        Você é o FamilyOS, um assistente pessoal inteligente.
+        
+        CONTEXTO ATUAL:
+        - Data/Hora: {data_atual}
+        - Quem está falando (Remetente): {usuario}
+
+        OBJETIVO:
+        Analise o texto e extraia um JSON estruturado seguindo estritamente estas regras:
+
+        1. SHOPPING (Compras):
+           - Categorias: PADARIA, CARNES, LIMPEZA, HORTIFRÚTI, OUTROS.
+           - Emoji: Escolha um emoji visualmente representativo.
+        
+        2. TASKS (Tarefas Domésticas):
+           - Prioridade (prio): 1 (Baixa), 2 (Média), 3 (Alta).
+           - Responsável (resp): 
+             - Se a frase for no plural ("Temos que", "Nós", "Vamos"), use "Casal".
+             - Se citar um nome explícito ("Débora precisa..."), use o nome citado.
+             - Se o sujeito for oculto ou primeira pessoa ("Lavar o carro", "Eu preciso..."), atribua ao REMETENTE ({usuario}).
+        
+        3. REMINDERS (Lembretes com Data/Hora):
+           - Se disser apenas a hora (ex: "às 14h"), assuma a data de HOJE.
+
+        FORMATO DE SAÍDA (JSON PURO):
         {{
             "shopping": [ {{ "nome": "item", "qty": 1, "cat": "CATEGORIA", "emoji": "🍎" }} ],
             "tasks": [ {{ "desc": "ação", "resp": "Nome", "prio": 1-3 }} ],
             "reminders": [ {{ "title": "título", "date": "YYYY-MM-DD", "time": "HH:MM", "notes": "detalhes" }} ]
         }}
-        Regras:
-        - Shopping Cats: PADARIA, CARNES, LIMPEZA, HORTIFRÚTI, OUTROS.
-        - Emoji: Escolha um emoji visualmente representativo para cada item de compra.
-        - Task Prio: 1(Baixa), 2(Média), 3(Alta). Resp: Thiago, Debora, Casal.
-        - Reminders: Se disser apenas a hora (ex: "às 14h"), assuma a data de HOJE.
         
-        Texto: "{texto}"
+        TEXTO DO USUÁRIO: "{texto}"
         """
         
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
         
-        res = chain.invoke({"data_atual": str_agora, "texto": texto_entrada})
+        # Passamos 'usuario' para o template preencher o contexto
+        res = chain.invoke({
+            "data_atual": str_agora, 
+            "texto": texto_entrada,
+            "usuario": usuario 
+        })
         
         clean_json = re.sub(r'```json|```', '', res.content).strip()
         if not clean_json.startswith('{') and not clean_json.startswith('['):
@@ -476,12 +499,12 @@ def voice_process():
             return jsonify({"message": "🧠 Cota de IA excedida. Tente em 1 minuto.", "status": "error"}), 429
         return jsonify({'erro': 'Falha na interpretação da IA.'}), 500
 
-    # --- 2. Processamento dos Dados ---
+    # --- 2. Processamento dos Dados (O resto do código permanece igual) ---
     logs_acao = []
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
 
     try:
-        # --- A. SHOPPING (Com salvamento de Emoji) ---
+        # --- A. SHOPPING ---
         shopping_add = []
         shopping_exist = []
 
@@ -492,25 +515,20 @@ def voice_process():
                 if not nome: continue 
 
                 cat_nome = item.get('cat', 'OUTROS').upper()
-                
-                # AQUI: Pegamos o emoji que a IA sugeriu
                 emoji_ia = item.get('emoji', '📦')
 
-                # Garante categoria
                 cat = Categoria.query.filter_by(nome=cat_nome).first()
                 if not cat: 
                     cat = Categoria(nome=cat_nome)
                     db.session.add(cat)
                     db.session.flush()
                 
-                # Garante produto e salva o EMOJI se for novo
                 prod = Produto.query.filter_by(nome=nome).first()
                 if not prod:
                     prod = Produto(nome=nome, categoria_id=cat.id, emoji=emoji_ia)
                     db.session.add(prod)
                     db.session.flush()
                 
-                # Verifica se já está na lista
                 existe = ListaItem.query.filter(
                     ListaItem.produto_id == prod.id, 
                     ListaItem.status.in_(['pendente', 'comprado'])
@@ -527,13 +545,12 @@ def voice_process():
                 else:
                     shopping_exist.append(nome.title())
 
-        # Formata Log Shopping
         msgs_shopping = []
         if shopping_add: msgs_shopping.append(f"🛒 Compra: {', '.join(shopping_add)}")
         if shopping_exist: msgs_shopping.append(f"⚠️ Já na lista: {', '.join(shopping_exist)}")
         if msgs_shopping: logs_acao.append(" | ".join(msgs_shopping))
 
-        # --- B. TASKS (Mantido Igual) ---
+        # --- B. TASKS ---
         tasks_add = []
         tasks_exist = []
 
@@ -543,7 +560,13 @@ def voice_process():
                 desc = task.get('desc', '').strip()
                 if not desc: continue 
 
-                resp = task.get('resp', 'Casal').capitalize()
+                # Fallback: Se a IA ainda falhar e mandar vazio, usa o usuario que enviou
+                resp_raw = task.get('resp')
+                if not resp_raw:
+                    resp = usuario.capitalize()
+                else:
+                    resp = resp_raw.capitalize()
+
                 try: prio = int(task.get('prio', 1))
                 except: prio = 1
 
@@ -640,6 +663,8 @@ def voice_process():
         db.session.rollback()
         logger.error(f"Erro Geral Omni: {traceback.format_exc()}")
         return jsonify({'erro': str(e)}), 500
+
+
 def tasks_magic():
     current_context = f"Hoje é {datetime.now().strftime('%A, %d de %B de %Y, às %H:%M')}."
     # 1. Configura IA
@@ -1017,7 +1042,6 @@ def trigger_manual_sync():
         logger.error(f"❌ Erro crítico no trigger: {e}")
         return jsonify({"status": "error", "message": "Erro interno."}), 500
     
-
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
