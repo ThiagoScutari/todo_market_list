@@ -803,35 +803,35 @@ def update_task():
 def sync_reminders():
     raw_data = request.get_json()
     
-    # Debug: Vamos ver a cara do inimigo se der erro de novo
-    # logger.info(f"📦 Payload Recebido: {str(raw_data)[:200]}...") 
+    # Debug: Print the exact type to be sure
+    # logger.info(f"📦 Type: {type(raw_data)} - Content: {str(raw_data)[:100]}")
 
     dados = []
 
-    # --- 1. LÓGICA DE DESEMBRULHO ROBUSTA ---
-    try:
-        # Cenário A: Chegou uma Lista (ex: [{"dados_agrupados": [...]}])
-        if isinstance(raw_data, list):
-            # Se o primeiro item é o wrapper do n8n
-            if len(raw_data) > 0 and isinstance(raw_data[0], dict) and 'dados_agrupados' in raw_data[0]:
-                dados = raw_data[0]['dados_agrupados']
+    # --- LOGIC TO EXTRACT DATA ---
+    # 1. If it's a list, check the first item
+    if isinstance(raw_data, list):
+        if len(raw_data) > 0:
+            first_item = raw_data[0]
+            # Case: The list contains the n8n wrapper object
+            if isinstance(first_item, dict) and 'dados_agrupados' in first_item:
+                dados = first_item['dados_agrupados']
+            # Case: The list is ALREADY the tasks (e.g. sent individually without batching)
             else:
-                # É uma lista pura de tarefas
                 dados = raw_data
-        
-        # Cenário B: Chegou um Dicionário (ex: {"dados_agrupados": [...]})
-        elif isinstance(raw_data, dict):
-            if 'dados_agrupados' in raw_data:
-                dados = raw_data['dados_agrupados']
-            else:
-                # É uma tarefa única
-                dados = [raw_data]
-    except Exception as e:
-        logger.error(f"Erro no parsing do JSON: {e}")
-        return jsonify({"erro": "Formato de JSON inválido"}), 400
+        else:
+            dados = [] # Empty list
 
-    # Garante que dados seja iterável
-    if not dados: dados = []
+    # 2. If it's a dict (single object or direct wrapper)
+    elif isinstance(raw_data, dict):
+        if 'dados_agrupados' in raw_data:
+            dados = raw_data['dados_agrupados']
+        else:
+            dados = [raw_data] # Single task wrapped in list
+    
+    # 3. Final Safety Check: Ensure 'dados' is a list
+    if not isinstance(dados, list):
+        dados = []
 
     usuario_padrao = request.args.get('usuario', 'Google')
     count_criado = 0
@@ -841,18 +841,21 @@ def sync_reminders():
 
     try:
         for item in dados:
-            if not isinstance(item, dict): continue
+            if not isinstance(item, dict): 
+                continue
 
-            # 2. TRATAMENTO DE CHAVES (HÍBRIDO)
+            # 2. HYBRID ID CHECK
             gid = item.get('google_id') or item.get('id')
             
             if not gid:
+                # Debug log for ignored items to help diagnose
+                # logger.warning(f"⚠️ Item ignorado (sem ID): {item.keys()}")
                 count_ignorados += 1
                 continue
 
             lembrete = Reminder.query.filter_by(google_id=gid).first()
 
-            # --- LÓGICA DE DELEÇÃO ---
+            # --- DELETION LOGIC ---
             is_deleted = item.get('deleted')
             should_delete = (is_deleted is True) or (str(is_deleted).lower() == 'true')
             
@@ -862,7 +865,7 @@ def sync_reminders():
                     count_deletado += 1
                 continue 
 
-            # --- LÓGICA DE CRIAÇÃO/ATUALIZAÇÃO ---
+            # --- CREATE/UPDATE LOGIC ---
             data_vencimento = None
             due_str = item.get('due')
             if due_str:
@@ -902,11 +905,6 @@ def sync_reminders():
             "deletados": count_deletado,
             "ignorados": count_ignorados
         }), 200
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Erro Sync Lembretes: {traceback.format_exc()}")
-        return jsonify({"erro": str(e)}), 500
 
     except Exception as e:
         db.session.rollback()
