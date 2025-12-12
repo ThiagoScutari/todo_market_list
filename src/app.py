@@ -803,35 +803,32 @@ def update_task():
 def sync_reminders():
     raw_data = request.get_json()
     
-    # Debug: Print the exact type to be sure
-    # logger.info(f"📦 Type: {type(raw_data)} - Content: {str(raw_data)[:100]}")
+    # DEBUG: Vamos ver no log exatamente as chaves do primeiro item para não ter dúvida
+    if isinstance(raw_data, list) and len(raw_data) > 0:
+        logger.info(f"📦 Debug Structure - Item 0 Keys: {raw_data[0].keys() if isinstance(raw_data[0], dict) else 'Not Dict'}")
 
-    dados = []
+    tasks_final = []
 
-    # --- LOGIC TO EXTRACT DATA ---
-    # 1. If it's a list, check the first item
-    if isinstance(raw_data, list):
-        if len(raw_data) > 0:
-            first_item = raw_data[0]
-            # Case: The list contains the n8n wrapper object
-            if isinstance(first_item, dict) and 'dados_agrupados' in first_item:
-                dados = first_item['dados_agrupados']
-            # Case: The list is ALREADY the tasks (e.g. sent individually without batching)
+    # --- LÓGICA DE DESEMBRULHO (FLATTENING) ---
+    # 1. Garante que raw_data seja uma lista para podermos iterar
+    if isinstance(raw_data, dict):
+        raw_list = [raw_data]
+    elif isinstance(raw_data, list):
+        raw_list = raw_data
+    else:
+        raw_list = []
+
+    # 2. Itera sobre cada item recebido e decide se desembrulha ou usa direto
+    for item in raw_list:
+        if isinstance(item, dict):
+            # Se encontrar a chave mágica do n8n, pega o conteúdo de dentro
+            if 'dados_agrupados' in item and isinstance(item['dados_agrupados'], list):
+                tasks_final.extend(item['dados_agrupados'])
             else:
-                dados = raw_data
-        else:
-            dados = [] # Empty list
-
-    # 2. If it's a dict (single object or direct wrapper)
-    elif isinstance(raw_data, dict):
-        if 'dados_agrupados' in raw_data:
-            dados = raw_data['dados_agrupados']
-        else:
-            dados = [raw_data] # Single task wrapped in list
+                # Caso contrário, o próprio item é a tarefa
+                tasks_final.append(item)
     
-    # 3. Final Safety Check: Ensure 'dados' is a list
-    if not isinstance(dados, list):
-        dados = []
+    # --- FIM DO TRATAMENTO ---
 
     usuario_padrao = request.args.get('usuario', 'Google')
     count_criado = 0
@@ -840,22 +837,19 @@ def sync_reminders():
     count_ignorados = 0
 
     try:
-        for item in dados:
-            if not isinstance(item, dict): 
-                continue
+        for item in tasks_final: # Usamos a lista processada agora
+            if not isinstance(item, dict): continue
 
-            # 2. HYBRID ID CHECK
+            # Busca ID (Google Raw 'id' ou FamilyOS 'google_id')
             gid = item.get('google_id') or item.get('id')
             
             if not gid:
-                # Debug log for ignored items to help diagnose
-                # logger.warning(f"⚠️ Item ignorado (sem ID): {item.keys()}")
                 count_ignorados += 1
                 continue
 
             lembrete = Reminder.query.filter_by(google_id=gid).first()
 
-            # --- DELETION LOGIC ---
+            # Deleção
             is_deleted = item.get('deleted')
             should_delete = (is_deleted is True) or (str(is_deleted).lower() == 'true')
             
@@ -865,7 +859,7 @@ def sync_reminders():
                     count_deletado += 1
                 continue 
 
-            # --- CREATE/UPDATE LOGIC ---
+            # Data
             data_vencimento = None
             due_str = item.get('due')
             if due_str:
@@ -875,6 +869,7 @@ def sync_reminders():
                 except:
                     pass
 
+            # Criação ou Atualização
             if not lembrete:
                 lembrete = Reminder(google_id=gid)
                 db.session.add(lembrete)
