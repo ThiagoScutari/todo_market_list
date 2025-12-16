@@ -1,140 +1,146 @@
 # 🏗️ Documento Mestre de Arquitetura: FamilyOS
 
-**Versão:** v2.1 (The Home OS)
-**Data da Revisão:** 05/12/2025
-**Status:** ✅ Produção (Operacional)
-**Escopo:** Gestão Doméstica Unificada (Compras, Tarefas, Clima)
+**Versão:** v2.2 (Omniscient Sync)
+**Data da Revisão:** 12/12/2025
+**Status:** ✅ Produção (Estável)
+**Escopo:** Gestão Doméstica Unificada & Assistente Pessoal Híbrido
 
 ---
 
 ## 1. Visão Estratégica
 
-### 1.1. O Conceito "FamilyOS"
-O sistema evoluiu de uma lista de compras para um **Sistema Operacional da Casa**. Ele centraliza informações vitais e atua proativamente na organização da rotina familiar através de um Dashboard central.
-
-### 1.2. Módulos do Sistema
-1.  **🏠 Dashboard:** Painel visual com Clima (Itajaí), Mensagem do Dia e Acesso Rápido.
-2.  **🛒 Mercado (Shopping):** Gestão de suprimentos com categorização automática.
-3.  **✅ Tarefas (Tasks):** Gestão de afazeres com:
-    * Atribuição automática (Thiago, Débora, Casal).
-    * Classificação de Prioridade (Baixa🟢, Média🟡, Alta🔴).
-    * Processamento de múltiplas tarefas em uma única mensagem.
-4.  **⏰ Futuro:** Ingredientes e Lembretes (Placeholders na UI).
+### 1.1. O Conceito
+O **FamilyOS** é um Sistema Operacional da Casa projetado para centralizar a rotina familiar (Thiago & Débora). Ele atua como um hub central que orquestra dados de diferentes fontes (Google Tasks, APIs de Clima, Input de Voz) e oferece uma interface unificada e simplificada ("Zero Friction").
 
 ---
 
-## 2. Arquitetura de Informação (UX/UI)
+## 2. Módulos Funcionais
 
-### 2.1. Estrutura de Navegação
-A aplicação agora utiliza uma arquitetura de **Base Template** com navegação inferior fixa.
+### 2.1. 🏠 Dashboard (Hub Central)
+O ponto de partida da aplicação.
+* **Widget de Clima:** Integração com HG Brasil (via Cache de Banco para evitar Rate Limit). Exibe temperatura, condição e cidade (Itajaí, SC).
+* **Mensagem do Dia:** Frase inspiracional ou informativa rotativa.
+* **Acesso Rápido:** Cards de navegação para os outros módulos com badges de contagem de pendências.
 
-* **Rota \`/\` (Dashboard):**
-    * Widget de Clima (API HG Brasil com Cache).
-    * Frase Inspiracional.
-    * Botões de Acesso Rápido com Badges de Notificação (Pendências).
-* **Rota \`/shopping\` (Mercado):** Lista clássica com checkboxes e edição via Long Press.
-* **Rota \`/tasks\` (Tarefas):** Quadro de tarefas agrupado por Responsável.
+### 2.2. 🛒 Mercado (Shopping)
+Gestão inteligente de suprimentos.
+* **Categorização:** Itens são organizados automaticamente (Hortifrúti, Padaria, Limpeza, etc.).
+* **Input:** Via Interface Web, Voz ou Texto.
+* **UX:** Checkbox circular grande para marcar comprados. Botão de "Limpar Carrinho" move itens para histórico.
 
----
+### 2.3. ✅ Tarefas (Tasks)
+Quadro de afazeres domésticos focados em execução.
+* **Atribuição Inteligente:** O sistema define o responsável automaticamente:
+    * *"Thiago precisa..."* ➝ Responsável: **Thiago**.
+    * *"Nós precisamos..."* ➝ Responsável: **Casal**.
+* **Priorização:** Classificação visual (🔴 Alta, 🟡 Média, 🟢 Baixa).
 
-## 3. Regras de Negócio e Inteligência (n8n + Gemini)
-
-### 3.1. Roteamento de Intenção (n8n Router)
-O n8n atua como triagem inicial. Um LLM analisa o texto/áudio e decide a rota:
-* **SHOPPING:** *"Comprar pão"* -> Posta em \`/magic\`.
-* **TASK:** *"Lavar o carro"* -> Posta em \`/tasks/magic\`.
-
-### 3.2. Lógica de Tarefas (NLP Avançado)
-O endpoint \`/tasks/magic\` utiliza o Google Gemini 2.5 Flash para extrair uma **Lista de Objetos**:
-
-1.  **Multi-Tasking:** Uma mensagem como *"Lavar o carro e comprar remédio"* gera ações distintas.
-2.  **Atribuição de Responsável:**
-    * Explícito: *"Thiago lavar louça"* -> Thiago.
-    * Coletivo: *"Temos que ir..."* -> Casal.
-    * Implícito: Se não citado, atribui ao remetente do Telegram.
-3.  **Prioridade:** Análise semântica de urgência ("agora", "hoje", "sem falta" = Alta).
+### 2.4. 🔔 Lembretes (Google Sync) **[NOVO - Sprint 9]**
+Módulo de agenda e compromissos com data marcada.
+* **Sincronização Bidirecional:** Integração total com **Google Tasks** e **Google Calendar**.
+    * O que é criado no Google aparece no FamilyOS.
+    * O que é concluído/deletado no Google some do FamilyOS.
+* **Batch Processing:** O sistema recebe e processa listas inteiras de tarefas de uma só vez para alta performance.
+* **Gatilho Manual:** Botão "Sincronizar Agora" na interface que dispara o Webhook do n8n.
 
 ---
 
-## 4. Banco de Dados (Schema v2.1 - PostgreSQL)
+## 3. Arquitetura de Infraestrutura
 
-O sistema migrou de SQLite para **PostgreSQL 15** rodando em Docker.
+O projeto segue uma arquitetura moderna baseada em microsserviços containerizados, com fluxos distintos para desenvolvimento e produção.
 
-### 4.1. Tabela \`tasks\`
-| Campo | Tipo | Detalhes |
+### 3.1. Ambiente de Homologação (Dev Local)
+Focado em agilidade e debug.
+1.  **IDE:** VSCode com extensões Python/Jinja2.
+2.  **Container:** Docker roda apenas o **PostgreSQL** localmente.
+3.  **Backend:** O Flask (`app.py`) roda nativamente na máquina para permitir debug em tempo real.
+4.  **Túnel:** **Ngrok** expõe a porta 5000 para receber Webhooks do n8n/Telegram durante testes.
+5.  **Testes de API:** **Postman** utilizado para validar payloads JSON brutos antes da implementação no n8n.
+6.  **Automação:** Instância de n8n (pode ser local ou a da VPS apontando para o Ngrok).
+7.  **Versionamento:** Git (Branch `develop` ou `feature/*`).
+
+### 3.2. Ambiente de Produção (VPS)
+Focado em estabilidade e segurança.
+1.  **Hospedagem:** VPS Linux (CentOS/AlmaLinux).
+2.  **Orquestração:** **Docker Compose** gerenciando todo o stack na rede `familyos_net`.
+    * `familyos-app`: Container Python/Gunicorn.
+    * `familyos-db`: Container PostgreSQL 15 (Alpine).
+    * `n8n`: Orquestrador de automação.
+    * `traefik`: Reverse Proxy e Gestão de Certificados SSL (HTTPS).
+3.  **Deploy:** Via Git Pull (`origin main`) + Docker Build.
+4.  **Integrações Externas:**
+    * **Google Tasks API:** Via Credenciais Cloud Console (OAuth2 gerenciado pelo n8n).
+    * **Google Calendar API:** Via Credenciais Cloud Console (OAuth2 gerenciado pelo n8n).
+    * **Google Gemini (IA):** Processamento de Linguagem Natural.
+    * **HG Brasil:** Dados meteorológicos.
+    * **OpenAI:** Whisper.
+
+---
+
+## 4. Stack Tecnológico
+
+### 4.1. Front-End
+* **Linguagem:** HTML5, CSS3 (Vanilla), JavaScript (ES6).
+* **Template Engine:** Jinja2 (Server-side rendering).
+* **Design System:** Tema "Cyberpunk Dark Neon".
+    * Cores: Deep Void (`#050509`), Neon Purple (`#611af0`), Neon Green (`#22ff7a`).
+    * Componentes: Cards translúcidos (Glassmorphism), Inputs customizados, Badges dinâmicos.
+* **Interatividade:**
+    * **Long Press (800ms):** Abre modais de edição.
+    * **Vibração (Haptic Feedback):** Ao concluir tarefas.
+    * **Optimistic UI:** Atualiza a tela antes da resposta do servidor.
+
+### 4.2. Back-End
+* **Framework:** Python Flask.
+* **ORM:** SQLAlchemy.
+* **Servidor WSGI:** Gunicorn (Produção).
+* **Rotas Críticas:**
+    * `POST /voice/process`: Recebe transcrição de áudio, usa Gemini para categorizar e insere no banco.
+    * `POST /reminders/sync`: Endpoint inteligente que aceita listas puras (`[...]`) do n8n para sincronia em massa.
+    * `POST /chat/process`: (Em desenvolvimento) Interface de chat ativo.
+
+### 4.3. Banco de Dados (PostgreSQL)
+Schema Relacional Normalizado.
+
+**Tabela: `reminders` (Atualizada)**
+| Coluna | Tipo | Função |
 | :--- | :--- | :--- |
-| \`id\` | Integer | PK |
-| \`descricao\` | String | O que fazer. |
-| \`responsavel\` | String | 'Thiago', 'Debora', 'Casal'. |
-| \`prioridade\` | Integer | 1 (Verde), 2 (Amarelo), 3 (Vermelho). |
-| \`status\` | String | 'pendente', 'concluido', 'arquivado'. |
-| \`created_at\` | DateTime | Data de criação. |
-
-### 4.2. Tabela \`weather_cache\`
-Cache para evitar rate-limit da API HG Brasil.
-| Campo | Tipo | Detalhes |
-| :--- | :--- | :--- |
-| \`id\` | Integer | PK |
-| \`city\` | String | 'Itajai,SC'. |
-| \`data_json\` | Text | JSON completo da API. |
-| \`last_updated\` | DateTime | Atualiza se > 60 min. |
-
-*(As tabelas \`users\`, \`lista_itens\`, \`produtos\` e \`categorias\` permanecem iguais à v1.2)*
+| `id` | SERIAL (PK) | Identificador local. |
+| `google_id` | VARCHAR | ID da tarefa no Google (Link de Sync). |
+| `title` | VARCHAR | Título do compromisso. |
+| `notes` | TEXT | Detalhes ou link para e-mail. |
+| `due_date` | TIMESTAMP | Data e hora do vencimento. |
+| `status` | VARCHAR | 'needsAction' ou 'completed'. |
+| `usuario` | VARCHAR | Quem criou/sincronizou. |
+| `last_updated` | TIMESTAMP | Controle de versão. |
 
 ---
 
-## 5. Infraestrutura e Deploy
+## 5. Automação e IA (O Cérebro)
 
-### 5.1. Docker Compose (Híbrido)
-* **Produção (VPS):** Roda App (Flask), Banco (Postgres), Traefik e n8n na mesma rede.
-* **Desenvolvimento (Local):** Docker roda apenas o Banco de Dados. Python roda localmente para debug.
+### 5.1. Fluxo de Sincronização (Google Tasks ↔ FamilyOS)
+Para resolver problemas de performance e timeouts, a arquitetura de sync foi refinada:
+1.  **Gatilho:** Cron (a cada 30min) OU Botão Manual no Front.
+2.  **n8n (Extração):** Node "Google Tasks" baixa todas as tarefas pendentes.
+3.  **n8n (Agregação):** Node "Item Lists" (Aggregate) compila as tarefas em uma única lista JSON (`tasks: [...]`).
+4.  **Envio:** Um único POST HTTP envia o pacote para o Python.
+5.  **Python:** Processa a lista, cria o que não existe, atualiza o que mudou e remove (Soft/Hard delete) o que foi concluído.
 
-### 5.2. Variáveis de Ambiente (.env)
-Novas chaves adicionadas:
-\`\`\`bash
-# Postgres
-DB_USER=family_user
-DB_PASSWORD=***
-DATABASE_URL=postgresql://...
-
-# API Externa
-HGBRASIL_KEY=***
-\`\`\`
-
----
-
-## 6. Roadmap de Execução
-
-| Sprint | Foco | Status |
-| :--- | :--- | :--- |
-| **Sprint 7** | Persistência e Base IA | ✅ Concluído |
-| **Sprint 8** | Módulo Tarefas e Postgres | ✅ Concluído |
-| **Sprint 9** | Dashboard e Clima | ✅ Concluído |
-| **Sprint 10** | Refinamento de Lembretes | 🔮 Futuro |
+### 5.2. Processamento de Linguagem Natural (Gemini 2.5)
+O sistema não usa comandos rígidos ("Adicionar X em Y"). Ele entende intenção:
+* *Input:* "Lavar o carro e a reunião com a diretoria é amanhã às 14h."
+* *Processamento:* O Gemini separa em:
+    1.  **Task:** "Lavar o carro" (Prio: Média, Resp: Thiago).
+    2.  **Reminder:** "Reunião Diretoria" (Data: Amanhã 14:00).
 
 ---
-# Sprint 9
 
-## 🆕 Módulo: Lembretes (Google Tasks Sync)
+## 6. Próximos Passos (Roadmap)
 
-### Visão Geral
-Gerenciamento de compromissos com data e hora marcadas, sincronizados bidirecionalmente com o Google Tasks.
+* [ ] **Módulo Chatbot:** Implementar interface de chat real-time (`chat.html`) substituindo o log estático.
+* [ ] **IA Ativa:** Permitir que o sistema pergunte coisas ("Você já comprou o leite que estava na lista?").
+* [ ] **Multi-usuário:** Refinar permissões para uso simultâneo intenso.
 
-### Regras de Negócio
-1.  **Fonte da Verdade Híbrida:** O sistema aceita alterações tanto do FamilyOS quanto do Google Apps.
-2.  **Agendamento:** Obrigatório ter Data. Hora é opcional (Dia inteiro).
-3.  **Vínculo com Gmail:** Se a tarefa vier de um e-mail, deve exibir um link "Abrir Gmail".
-4.  **Notificações:** O próprio app do Google Tasks no celular cuidará dos push notifications (nós não precisamos recriar isso).
-
-### Banco de Dados: Tabela `reminders`
-| Campo | Tipo | Descrição |
-| :--- | :--- | :--- |
-| `id` | Integer (PK) | ID Interno. |
-| `google_id` | String (Unique) | ID da tarefa no Google (para sync). |
-| `title` | String | Título do lembrete. |
-| `notes` | Text | Detalhes ou Link do Gmail. |
-| `due_date` | DateTime | Data/Hora de vencimento. |
-| `status` | String | 'needsAction' (pendente) ou 'completed'. |
-| `last_sync` | DateTime | Quando foi atualizado pela última vez. |
-
-**Autor:** Thiago Scutari.
+---
+**Autor:** Thiago Scutari & FamilyOS AI
+**Documentação Gerada Automaticamente**

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="chat-wrapper">
+    <div id="chat-container">
+        <div id="messages"></div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="chat-input" placeholder="Digite sua mensagem..." autocomplete="off" autofocus>
+        <button id="send-button">
+            <i class="fas fa-paper-plane">Enviar</i>
+        </button>
+    </div>
+</div>
+{% endblock %}

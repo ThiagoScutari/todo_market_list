@@ -1,0 +1,52 @@
+:root {
+    --neon-p: #39ff14;
+    --bg: #2e2e2e;
+}
+
+#chat-container {
+    background-color: var(--bg);
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+#messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+.user {
+    text-align: right;
+    color: var(--neon-p);
+}
+
+.bot {
+    text-align: left;
+    color: #ccc;
+}
+
+.task-card, .reminder-card {
+    background-color: #444;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+}
+
+input[type="text"] {
+    width: calc(100% - 60px);
+    padding: 10px;
+    margin-right: 10px;
+}
+
+button {
+    padding: 10px;
+    background-color: var(--neon-p);
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #2ecc71;
+}

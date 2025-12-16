@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FamilyOS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1><i class="bi bi-cart3"></i> FamilyOS</h1>
+        <a href="/logout"><i class="bi bi-box-arrow-right"></i></a>
+    </header>
+
+    <div class="container">
+        {% if not categorias %}
+            <div style="text-align: center; margin-top: 80px; color: var(--text-sec);">
+                <i class="bi bi-basket" style="font-size: 4rem; opacity: 0.2;"></i>
+                <p>Lista Vazia</p>
+            </div>
+        {% endif %}
+
+        {% for cat, itens in categorias.items() %}
+        <div class="category-section">
+            <div class="category-header" onclick="toggleSection(this)">
+                {{ cat }} <span style="opacity:0.5; font-size:0.8em">({{ itens|length }})</span>
+            </div>
+            <div class="product-list">
+                {% for item in itens %}
+                <div class="product-card {% if item.status == 'comprado' %}checked{% endif %}"
+                     id="card-{{ item.id }}"
+                     data-id="{{ item.id }}">
+
+                    <div class="product-info">
+                        <div class="product-name"><span class="emoji">{{ item.emoji }}</span> {{ item.nome }}</div>
+                        <div class="product-meta">
+                            {{ item.detalhes }} • <i class="bi bi-person-fill"></i> {{ item.usuario }}
+                        </div>
+                    </div>
+
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="check-{{ item.id }}"
+                               onchange="toggleItem(this, {{ item.id }})"
+                               {% if item.status == 'comprado' %}checked{% endif %}>
+                        <label for="check-{{ item.id }}"></label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if categorias %}
+        <button class="btn-clear" onclick="clearCart()">
+            <i class="bi bi-trash"></i> Limpar Carrinho
+        </button>
+        {% endif %}
+    </div>
+
+    <div id="editModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="margin-top:0">EDITAR ITEM</h3>
+            <form id="editForm">
+                <input type="hidden" id="eid">
+                <label>Nome</label>
+                <input type="text" id="enome" autocomplete="off">
+
+                <label>Categoria</label>
+                <input type="text" id="ecat" list="catList" autocomplete="off" placeholder="Selecione ou digite..."
+                       onmousedown="if(this.value === ''){this.value=' ';this.value='';}"
+                       onclick="this.focus();">
+
+                <datalist id="catList">
+                    {% for cat in categorias.keys() %}
+                    <option value="{{ cat }}">
+                    {% endfor %}
+                </datalist>
+
+                <button type="submit" class="btn-save">SALVAR</button>
+                <div style="text-align:center; margin-top:15px; color:rgba(255,255,255,0.4); cursor:pointer"
+                     onclick="document.getElementById('editModal').classList.remove('visible')">
+                    Cancelar
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleSection(header) {
+            const lista = header.nextElementSibling;
+            lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
+        }
+        function toggleItem(checkbox, id) {
+            const card = document.getElementById('card-' + id);
+            if (checkbox.checked) {
+                card.classList.add('checked');
+                if (navigator.vibrate) navigator.vibrate(50);
+            } else {
+                card.classList.remove('checked');
+            }
+            fetch('/toggle_item/' + id, { method: 'POST' });
+        }
+        function clearCart() {
+            if (confirm('Arquivar itens comprados?')) {
+                fetch('/clear_cart', { method: 'POST' }).then(() => location.reload());
+            }
+        }
+        let pressTimer;
+        const cards = document.querySelectorAll('.product-card');
+        cards.forEach(card => {
+            const start = (e) => {
+                if (e.target.closest('.checkbox-wrapper')) return;
+                pressTimer = setTimeout(() => {
+                    openModal(card);
+                    if (navigator.vibrate) navigator.vibrate(100);
+                }, 800);
+            };
+            const end = () => clearTimeout(pressTimer);
+            card.addEventListener('mousedown', start);
+            card.addEventListener('touchstart', start);
+            card.addEventListener('mouseup', end);
+            card.addEventListener('touchend', end);
+            card.addEventListener('mouseleave', end);
+            card.addEventListener('touchmove', end);
+        });
+        function openModal(card) {
+            const id = card.dataset.id;
+            const fullText = card.querySelector('.product-name').innerText;
+            const nome = fullText.replace(/^[^\w\sÀ-ÿ]+/, '').trim();
+            const cat = card.closest('.category-section').querySelector('.category-header').innerText.split('(')[0].trim();
+            document.getElementById('eid').value = id;
+            document.getElementById('enome').value = nome;
+            document.getElementById('ecat').value = cat;
+            document.getElementById('editModal').classList.add('visible');
+        }
+        document.getElementById('editForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                id: document.getElementById('eid').value,
+                nome: document.getElementById('enome').value,
+                categoria: document.getElementById('ecat').value
+            };
+            await fetch('/update_item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            location.reload();
+        };
+    </script>
+</body>
+</html>

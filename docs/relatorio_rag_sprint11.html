@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>relatorio_rag_sprint11.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<p>user_input,retrieved_contexts,response,reference,context_precision,context_recall,faithfulness,answer_relevancy
+Explique o que faz a rota /voice/process.,&quot;['---\n\n## 🧠 2. Core Intelligence (IA &amp; Voz)\n\nEndpoint central que processa linguagem natural (Gemini) para estruturar dados.\n\n### 2.1. Processador Omniscient (Voz/Texto)\n<strong>Rota:</strong> <code>POST /voice/process</code>\n<strong>Descrição:</strong> O &quot;&quot;cérebro&quot;&quot; único do sistema. Recebe texto (transcrito ou digitado), identifica a intenção (Compras, Tarefas ou Lembretes) e executa a ação correspondente.\n\n* <strong>Headers:</strong> <code>Content-Type: application/json</code>\n* <strong>Corpo da Requisição (JSON):</strong>\n    <code>json\n    {\n      &quot;&quot;texto&quot;&quot;: &quot;&quot;Lavar o carro e comprar leite&quot;&quot;,\n      &quot;&quot;usuario&quot;&quot;: &quot;&quot;Thiago&quot;&quot;\n    }\n    </code>\n* <strong>Lógica de Negócio (Gemini 2.5):</strong>\n    1.  <strong>Shopping:</strong> Verifica duplicidade, categoriza e insere.\n    2.  <strong>Tasks:</strong> Define prioridade (1-3) e responsável (Thiago/Débora/Casal).\n    3.  <strong>Reminders:</strong> Cria lembrete local e dispara webhook para criar no Google Tasks.\n* <strong>Resposta (201 Created):</strong>\n    <code>json\n    {\n      &quot;&quot;message&quot;&quot;: &quot;&quot;🛒 Compra: 📦 Leite | ✅ Tarefa (Thiago): Lavar o carro&quot;&quot;\n    }\n    </code>\n\n---', '### 4.2. Back-End\n* <strong>Framework:</strong> Python Flask.\n* <strong>ORM:</strong> SQLAlchemy.\n* <strong>Servidor WSGI:</strong> Gunicorn (Produção).\n* <strong>Rotas Críticas:</strong>\n    * <code>POST /voice/process</code>: Recebe transcrição de áudio, usa Gemini para categorizar e insere no banco.\n    * <code>POST /reminders/sync</code>: Endpoint inteligente que aceita listas puras (<code>[...]</code>) do n8n para sincronia em massa.\n    * <code>POST /chat/process</code>: (Em desenvolvimento) Interface de chat ativo.\n\n### 4.3. Banco de Dados (PostgreSQL)\nSchema Relacional Normalizado.']&quot;,&quot;A rota <code>POST /voice/process</code> é um endpoint central no sistema que processa linguagem natural, tanto em formato de texto transcrito quanto digitado. Esta rota atua como o &quot;&quot;cérebro&quot;&quot; do sistema, utilizando a inteligência artificial Gemini para identificar a intenção do texto recebido e executar ações correspondentes.</p>
+<h3 id="funcionamento">Funcionamento:</h3>
+<ol>
+<li>
+<p><strong>Recepção de Dados:</strong></p>
+<ul>
+<li>A rota espera receber uma requisição com o cabeçalho <code>Content-Type: application/json</code>.</li>
+<li>O corpo da requisição deve conter um JSON com os campos &quot;&quot;texto&quot;&quot; (a frase a ser processada) e &quot;&quot;usuario&quot;&quot; (o nome do usuário que está enviando a requisição).</li>
+</ul>
+</li>
+<li>
+<p><strong>Processamento de Linguagem Natural:</strong></p>
+<ul>
+<li>O sistema analisa o texto para identificar a intenção, que pode ser relacionada a Compras, Tarefas ou Lembretes.</li>
+</ul>
+</li>
+<li>
+<p><strong>Lógica de Negócio (Gemini 2.5):</strong></p>
+<ul>
+<li><strong>Shopping:</strong> Verifica se há itens duplicados, categoriza os itens de compra e os insere no banco de dados.</li>
+<li><strong>Tasks:</strong> Define a prioridade das tarefas (em uma escala de 1 a 3) e atribui um responsável (Thiago, Débora ou Casal).</li>
+<li><strong>Reminders:</strong> Cria um lembrete localmente e dispara um webhook para criar o lembrete no Google Tasks.</li>
+</ul>
+</li>
+<li>
+<p><strong>Resposta:</strong></p>
+<ul>
+<li>Após o processamento, a rota retorna uma resposta com o status <code>201 Created</code>, incluindo uma mensagem que resume as ações realizadas, como a adição de itens de compra e a criação de tarefas.</li>
+</ul>
+</li>
+</ol>
+<p>Este endpoint é implementado usando o framework Python Flask, com SQLAlchemy como ORM para interagir com um banco de dados PostgreSQL. O servidor WSGI Gunicorn é utilizado em produção para gerenciar as requisições.&quot;,&quot;A rota POST /voice/process é o endpoint central de inteligência do sistema. Ela atua como um 'cérebro' que recebe texto (transcrito ou digitado), identifica a intenção do usuário (Compras, Tarefas ou Lembretes) utilizando o modelo Gemini 2.5 e executa a ação correspondente no banco de dados, retornando uma mensagem consolidada com o que foi criado.&quot;,0.99999999995,1.0,1.0,0.5726343881919796
+&quot;Explique a lógica de negócio de cada módulo (shopping, tasks, reminders) processada pelo Gemini.&quot;,&quot;['### 5.2. Processamento de Linguagem Natural (Gemini 2.5)\nO sistema não usa comandos rígidos (&quot;&quot;Adicionar X em Y&quot;&quot;). Ele entende intenção:\n* <em>Input:</em> &quot;&quot;Lavar o carro e a reunião com a diretoria é amanhã às 14h.&quot;&quot;\n* <em>Processamento:</em> O Gemini separa em:\n    1.  <strong>Task:</strong> &quot;&quot;Lavar o carro&quot;&quot; (Prio: Média, Resp: Thiago).\n    2.  <strong>Reminder:</strong><input type="checkbox" id="checkbox2"><label for="checkbox2"></label><strong>Módulo Chatbot:</strong> Implementar interface de chat real-time (<code>chat.html</code><input type="checkbox" id="checkbox1"><label for="checkbox1"></label><strong>IA Ativa:</strong><input type="checkbox" id="checkbox0"><label for="checkbox0"></label><strong>Multi-usuário:</strong> Refinar permissões para uso simultâneo intenso.\n\n---\n<strong>Autor:</strong> Thiago Scutari &amp; FamilyOS AI\n<strong>Documentação Gerada Automaticamente</strong>', '---\n\n## 🧠 2. Core Intelligence (IA &amp; Voz)\n\nEndpoint central que processa linguagem natural (Gemini) para estruturar dados.\n\n### 2.1. Processador Omniscient (Voz/Texto)\n<strong>Rota:</strong> <code>POST /voice/process</code>\n<strong>Descrição:</strong> O &quot;&quot;cérebro&quot;&quot; único do sistema. Recebe texto (transcrito ou digitado), identifica a intenção (Compras, Tarefas ou Lembretes) e executa a ação correspondente.\n\n* <strong>Headers:</strong> <code>Content-Type: application/json</code>\n* <strong>Corpo da Requisição (JSON):</strong>\n    <code>json\n    {\n      &quot;&quot;texto&quot;&quot;: &quot;&quot;Lavar o carro e comprar leite&quot;&quot;,\n      &quot;&quot;usuario&quot;&quot;: &quot;&quot;Thiago&quot;&quot;\n    }\n    </code>\n* <strong>Lógica de Negócio (Gemini 2.5):</strong>\n    1.  <strong>Shopping:</strong> Verifica duplicidade, categoriza e insere.\n    2.  <strong>Tasks:</strong> Define prioridade (1-3) e responsável (Thiago/Débora/Casal).\n    3.  <strong>Reminders:</strong> Cria lembrete local e dispara webhook para criar no Google Tasks.\n* <strong>Resposta (201 Created):</strong>\n    <code>json\n    {\n      &quot;&quot;message&quot;&quot;: &quot;&quot;🛒 Compra: 📦 Leite | ✅ Tarefa (Thiago): Lavar o carro&quot;&quot;\n    }\n    </code>\n\n---']&quot;,&quot;O sistema Gemini 2.5 processa linguagem natural para identificar e estruturar dados em três categorias principais: Compras (Shopping), Tarefas (Tasks) e Lembretes (Reminders). Abaixo está a explicação da lógica de negócio para cada módulo:</p>
+<h3 id="1-shopping-compras">1. Shopping (Compras)</h3>
+<ul>
+<li><strong>Verificação de Duplicidade:</strong> O sistema verifica se o item de compra já existe na lista para evitar duplicações.</li>
+<li><strong>Categorização:</strong> Os itens são categorizados para facilitar a organização e o gerenciamento. Isso pode incluir a classificação por tipo de produto ou urgência.</li>
+<li><strong>Inserção:</strong> Após a verificação e categorização, o item é inserido na lista de compras.</li>
+</ul>
+<h3 id="2-tasks-tarefas">2. Tasks (Tarefas)</h3>
+<ul>
+<li><strong>Definição de Prioridade:</strong> Cada tarefa é atribuída uma prioridade que varia de 1 a 3. Isso ajuda a determinar a urgência e a importância da tarefa.</li>
+<li><strong>Atribuição de Responsável:</strong> As tarefas são atribuídas a um responsável específico, que pode ser Thiago, Débora ou o casal (Thiago e Débora juntos). Isso garante que cada tarefa tenha um responsável claro.</li>
+</ul>
+<h3 id="3-reminders-lembretes">3. Reminders (Lembretes)</h3>
+<ul>
+<li><strong>Criação de Lembrete Local:</strong> O sistema cria um lembrete localmente para garantir que o usuário seja notificado sobre o evento ou tarefa.</li>
+<li><strong>Disparo de Webhook para Google Tasks:</strong> Além de criar o lembrete local, o sistema dispara um webhook para integrar o lembrete com o Google Tasks, permitindo que o usuário tenha acesso ao lembrete em diferentes plataformas e dispositivos.</li>
+</ul>
+<p>Esses módulos trabalham em conjunto para garantir que as intenções do usuário sejam corretamente identificadas e processadas, resultando em uma experiência de usuário eficiente e organizada.&quot;,&quot;Para Shopping, o sistema verifica duplicidade, categoriza o item e insere no banco. Para Tasks, ele define a prioridade (1 a 3) e o responsável (Thiago, Débora ou Casal). Para Reminders, ele cria o lembrete localmente e dispara um webhook para criar a tarefa correspondente no Google Tasks.&quot;,0.49999999995,1.0,0.6,0.5247639445883229
+Quais são as rotas GET disponíveis no frontend?,&quot;['---\n\n## ✅ 5. Módulo de Tarefas (Ações)\n\n### 5.1. Concluir Tarefa\n<strong>Rota:</strong> <code>POST /toggle_task/&lt;id&gt;</code>\n<strong>Descrição:</strong> Alterna status entre <code>pendente</code> e <code>concluido</code>.\n\n### 5.2. Arquivar Concluídas\n<strong>Rota:</strong> <code>POST /clear_tasks</code>\n<strong>Descrição:</strong> Move tarefas <code>concluido</code> para <code>arquivado</code>.\n\n### 5.3. Editar Tarefa\n<strong>Rota:</strong> <code>POST /tasks/update</code>\n<strong>Descrição:</strong> Atualiza descrição, responsável e prioridade.\n\n---\n\n## 🌐 6. Views (Frontend)\n\n* <code>GET /</code> - Dashboard (Home).\n* <code>GET /login</code> - Tela de Login.\n* <code>GET /shopping</code> - Lista de Compras.\n* <code>GET /tasks</code> - Kanban de Tarefas.\n* <code>GET /reminders</code> - Lista de Lembretes.', '# 🎨 FamilyOS Frontend Documentation\n\n<strong>Versão:</strong> 2.2 (Omniscient Sync)\n<strong>Stack:</strong> HTML5, Jinja2, CSS3 (Vanilla), JavaScript (Vanilla ES6)\n<strong>Design System:</strong> Cyberpunk Dark Neon\n\n---\n\n## 1. Estrutura de Navegação (Sitemap)\n\nA aplicação utiliza um layout mestre (<code>base.html</code>) com navegação inferior fixa (Tab Bar).\n\n* <strong><code>/</code> (Dashboard):</strong> Hub central. Exibe saudação, clima, frase do dia e atalhos rápidos.\n* <strong><code>/shopping</code> (Mercado):</strong> Lista de compras categorizada com edição rápida.\n* <strong><code>/tasks</code> (Tarefas):</strong> Quadro de gestão de afazeres agrupado por responsável.\n* <strong><code>/reminders</code> (Lembretes):</strong> Agenda sincronizada com Google Tasks.\n* <strong><code>/login</code>:</strong> Tela de acesso seguro.\n\n---\n\n## 2. Design System (CSS)\n\nO sistema utiliza variáveis CSS (<code>:root</code>) para garantir consistência no tema escuro.']&quot;,&quot;As rotas GET disponíveis no frontend são:</p>
+<ol>
+<li>
+<p><code>GET /</code> - Dashboard (Home).</p>
+</li>
+<li>
+<p><code>GET /login</code> - Tela de Login.</p>
+</li>
+<li>
+<p><code>GET /shopping</code> - Lista de Compras.</p>
+</li>
+<li>
+<p><code>GET /tasks</code> - Kanban de Tarefas.</p>
+</li>
+<li>
+<p><code>GET /reminders</code> - Lista de Lembretes.&quot;,&quot;As rotas GET disponíveis são: / (Dashboard/Home), /login (Tela de Login), /shopping (Lista de Compras), /tasks (Kanban de Tarefas) e /reminders (Lista de Lembretes).&quot;,0.99999999995,1.0,1.0,0.8537770258068468
+Explique o funcionamento da rota de Sincronização em Lote.,&quot;['---\n\n## 🔔 3. Módulo de Lembretes (Google Sync)\n\nGerenciamento de agenda com sincronização bidirecional (Google Tasks).\n\n### 3.1. Sincronização em Lote (Batch Sync)\n<strong>Rota:</strong> <code>POST /reminders/sync</code>\n<strong>Descrição:</strong> Recebe uma lista de tarefas do n8n (Google Tasks) e atualiza o banco local.\n* <strong>Lógica:</strong> Aceita Payload Puro (Lista) ou Payload Agregado pelo n8n.\n* <strong>Corpo da Requisição (Lista JSON):</strong>\n    <code>json\n    [\n      {\n        &quot;&quot;id&quot;&quot;: &quot;&quot;GTASK_ID_123&quot;&quot;,\n        &quot;&quot;title&quot;&quot;: &quot;&quot;Reunião&quot;&quot;,\n        &quot;&quot;due&quot;&quot;: &quot;&quot;2025-12-12T14:00:00.000Z&quot;&quot;,\n        &quot;&quot;status&quot;&quot;: &quot;&quot;needsAction&quot;&quot;,\n        &quot;&quot;deleted&quot;&quot;: false\n      }\n    ]\n    </code>\n* <strong>Resposta (200 OK):</strong>\n    <code>json\n    {\n      &quot;&quot;status&quot;&quot;: &quot;&quot;success&quot;&quot;,\n      &quot;&quot;criados&quot;&quot;: 1,\n      &quot;&quot;atualizados&quot;&quot;: 0,\n      &quot;&quot;deletados&quot;&quot;: 0\n    }\n    </code>\n\n### 3.2. Criar Lembrete\n<strong>Rota:</strong> <code>POST /reminders/create</code>\n<strong>Descrição:</strong> Cria lembrete localmente e dispara gatilho para o n8n criar no Google.\n* <strong>Corpo:</strong> <code>{&quot;&quot;title&quot;&quot;: &quot;&quot;Ir ao médico&quot;&quot;, &quot;&quot;date&quot;&quot;: &quot;&quot;2025-12-20&quot;&quot;, &quot;&quot;time&quot;&quot;: &quot;&quot;10:00&quot;&quot;}</code>', '### 2.4. 🔔 Lembretes (Google Sync) <strong>[NOVO - Sprint 9]</strong>\nMódulo de agenda e compromissos com data marcada.\n* <strong>Sincronização Bidirecional:</strong> Integração total com <strong>Google Tasks</strong> e <strong>Google Calendar</strong>.\n    * O que é criado no Google aparece no FamilyOS.\n    * O que é concluído/deletado no Google some do FamilyOS.\n* <strong>Batch Processing:</strong> O sistema recebe e processa listas inteiras de tarefas de uma só vez para alta performance.\n* <strong>Gatilho Manual:</strong> Botão &quot;&quot;Sincronizar Agora&quot;&quot; na interface que dispara o Webhook do n8n.\n\n---\n\n## 3. Arquitetura de Infraestrutura\n\nO projeto segue uma arquitetura moderna baseada em microsserviços containerizados, com fluxos distintos para desenvolvimento e produção.']&quot;,&quot;A rota de Sincronização em Lote (<code>POST /reminders/sync</code>) é projetada para integrar e atualizar eficientemente o banco de dados local com as tarefas do Google Tasks, utilizando um processo de sincronização bidirecional. Aqui está uma explicação técnica do seu funcionamento:</p>
+</li>
+<li>
+<p><strong>Recepção de Dados:</strong></p>
+<ul>
+<li>A rota aceita uma requisição <code>POST</code> contendo um corpo no formato de uma lista JSON. Esta lista pode ser um payload puro ou um payload agregado pelo n8n, uma ferramenta de automação de fluxos de trabalho.</li>
+<li>Cada item na lista representa uma tarefa do Google Tasks, com atributos como <code>id</code>, <code>title</code>, <code>due</code>, <code>status</code>, e <code>deleted</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Processamento em Lote:</strong></p>
+<ul>
+<li>O sistema é projetado para processar listas inteiras de tarefas de uma só vez, o que é conhecido como processamento em lote. Isso é feito para otimizar a performance e reduzir a carga de processamento, permitindo que múltiplas tarefas sejam sincronizadas simultaneamente.</li>
+</ul>
+</li>
+<li>
+<p><strong>Atualização do Banco de Dados Local:</strong></p>
+<ul>
+<li>Para cada tarefa recebida, o sistema verifica se a tarefa já existe no banco de dados local.</li>
+<li>Dependendo do status e dos atributos da tarefa, o sistema pode criar novas entradas, atualizar tarefas existentes ou marcar tarefas como deletadas.</li>
+<li>A lógica de atualização considera o campo <code>status</code> (por exemplo, <code>needsAction</code>) e o campo <code>deleted</code> para determinar as ações apropriadas.</li>
+</ul>
+</li>
+<li>
+<p><strong>Resposta da API:</strong></p>
+<ul>
+<li>Após o processamento, a API retorna uma resposta com o status <code>200 OK</code>, indicando que a operação foi bem-sucedida.</li>
+<li>A resposta inclui um resumo das operações realizadas: quantas tarefas foram criadas, atualizadas ou deletadas.</li>
+</ul>
+</li>
+<li>
+<p><strong>Sincronização Bidirecional:</strong></p>
+<ul>
+<li>A sincronização é bidirecional, o que significa que as alterações feitas no Google Tasks são refletidas no sistema local (FamilyOS) e vice-versa. Isso garante que os dados estejam sempre atualizados em ambas as plataformas.</li>
+</ul>
+</li>
+<li>
+<p><strong>Integração com n8n:</strong></p>
+<ul>
+<li>O n8n atua como um intermediário que facilita a comunicação entre o Google Tasks e o sistema local, disparando webhooks e gerenciando o fluxo de dados.</li>
+</ul>
+</li>
+</ol>
+<p>Em resumo, a rota de Sincronização em Lote é uma parte crucial do módulo de lembretes, permitindo que o sistema mantenha a consistência dos dados entre o Google Tasks e o banco de dados local de forma eficiente e em tempo real.&quot;,&quot;A rota POST /reminders/sync recebe uma lista de tarefas do n8n (Google Tasks), aceitando tanto payload puro (lista) quanto agregado. Ela processa essa lista para atualizar o banco local e retorna um JSON com o status de sucesso e a contagem de itens criados, atualizados ou deletados.&quot;,0.9999999999,1.0,0.7142857142857143,0.4085130450838617
+Explique a estrutura e função da tabela lista_itens.,&quot;['### 🍎 Tabela: <code>produtos</code>\nCatálogo de itens conhecidos (memória do sistema).\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>nome</strong> | <code>varchar</code> | 100 | Não | Nome do produto. |\n| <strong>emoji</strong> | <code>varchar</code> | 10 | Sim | Ícone visual. |\n| <strong>categoria_id</strong> | <code>integer</code> | - | Sim | FK para <code>categorias</code>. |\n| <strong>unidade_padrao_id</strong> | <code>integer</code> | - | Sim | FK para <code>unidades_medida</code>. |\n\n### 🛒 Tabela: <code>lista_itens</code> (Core do Mercado)\nItens da lista de compras ativa e histórico.', &quot;&quot;### 🛒 Tabela: <code>lista_itens</code> (Core do Mercado)\nItens da lista de compras ativa e histórico.\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>produto_id</strong> | <code>integer</code> | - | Sim | FK para <code>produtos</code>. |\n| <strong>quantidade</strong> | <code>double</code> | - | Não | Quantidade a comprar. |\n| <strong>unidade_id</strong> | <code>integer</code> | - | Sim | FK para <code>unidades_medida</code>. |\n| <strong>usuario</strong> | <code>varchar</code> | 50 | Sim | Quem solicitou. |\n| <strong>status</strong> | <code>varchar</code> | 20 | Sim | 'pendente', 'comprado', 'finalizado'. |\n| <strong>adicionado_em</strong> | <code>timestamp</code> | - | Sim | Data de criação. |\n| <strong>origem_input</strong> | <code>varchar</code> | 100 | Sim | Fonte (ex: 'omniscient'). |\n\n### ✅ Tabela: <code>tasks</code> (Core de Tarefas)\nGerenciamento de afazeres domésticos simples (Kanban).&quot;&quot;]&quot;,&quot;A tabela <code>lista_itens</code> é uma parte central do sistema de gerenciamento de listas de compras, referida como &quot;&quot;Core do Mercado&quot;&quot;. Ela armazena informações sobre os itens que compõem a lista de compras ativa, bem como o histórico de compras. A estrutura da tabela é projetada para capturar detalhes essenciais sobre cada item na lista de compras, permitindo um acompanhamento eficaz do que precisa ser comprado, quem solicitou, e o status atual de cada item.</p>
+<h3 id="estrutura-da-tabela-listaitens">Estrutura da Tabela <code>lista_itens</code>:</h3>
+<ul>
+<li>
+<p><strong>id</strong> (<code>integer</code>): Esta é a chave primária da tabela, garantindo que cada entrada na tabela seja única.</p>
+</li>
+<li>
+<p><strong>produto_id</strong> (<code>integer</code>): Esta coluna é uma chave estrangeira que referencia a tabela <code>produtos</code>. Ela identifica qual produto específico está sendo listado para compra. A coluna é opcional (pode ser nula), o que sugere que pode haver itens na lista que não estão diretamente associados a um produto do catálogo.</p>
+</li>
+<li>
+<p><strong>quantidade</strong> (<code>double</code>): Indica a quantidade do produto que precisa ser comprada. Esta coluna é obrigatória, refletindo a necessidade de especificar quanto de cada item é necessário.</p>
+</li>
+<li>
+<p><strong>unidade_id</strong> (<code>integer</code>): Esta coluna é uma chave estrangeira que referencia a tabela <code>unidades_medida</code>, especificando a unidade de medida para a quantidade do produto. É opcional, permitindo flexibilidade na especificação de unidades.</p>
+</li>
+<li>
+<p><strong>usuario</strong> (<code>varchar</code>, 50): Armazena o nome do usuário que solicitou o item. Esta coluna é opcional, permitindo que a lista de compras seja gerida por múltiplos usuários ou de forma anônima.</p>
+</li>
+<li>
+<p><strong>status</strong> (<code>varchar</code>, 20): Indica o estado atual do item na lista de compras. Os valores possíveis são 'pendente', 'comprado', e 'finalizado', permitindo o acompanhamento do progresso de cada item desde a adição até a compra e conclusão.</p>
+</li>
+<li>
+<p><strong>adicionado_em</strong> (<code>timestamp</code>): Registra a data e hora em que o item foi adicionado à lista. Esta informação é útil para rastrear quando os itens foram solicitados e para fins de histórico.</p>
+</li>
+<li>
+<p><strong>origem_input</strong> (<code>varchar</code>, 100): Especifica a fonte de onde o item foi adicionado, como 'omniscient'. Esta coluna é opcional e pode ser usada para identificar a origem dos dados, especialmente em sistemas que agregam informações de múltiplas fontes.</p>
+</li>
+</ul>
+<h3 id="fun%C3%A7%C3%A3o-da-tabela">Função da Tabela:</h3>
+<p>A tabela <code>lista_itens</code> serve como o núcleo para o gerenciamento de listas de compras dentro do sistema. Ela permite que os usuários adicionem itens que precisam ser comprados, acompanhem o status desses itens, e mantenham um registro histórico das compras realizadas. A estrutura da tabela suporta a integração com outras tabelas, como <code>produtos</code> e <code>unidades_medida</code>, para fornecer informações detalhadas sobre cada item, garantindo que o processo de compras seja eficiente e bem documentado.&quot;,&quot;A tabela lista_itens é o core do módulo de mercado. Ela armazena os itens da lista de compras (ativa e histórico), contendo colunas para ID (PK), referência ao produto (FK), quantidade, unidade de medida (FK), usuário solicitante, status (pendente, comprado, finalizado), data de adição e origem do input.&quot;,0.49999999995,1.0,1.0,0.7047828675318103
+Qual tabela é utilizada para armazenar cache de dados externos e evitar rate-limit?,&quot;[&quot;&quot;### ⛅ Tabela: <code>weather_cache</code>\nCache para evitar rate-limit da API de Clima.\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>city</strong> | <code>varchar</code> | 50 | Sim | Chave de busca (ex: 'Itajai,SC'). |\n| <strong>data_json</strong> | <code>text</code> | - | Sim | JSON bruto da API externa. |\n| <strong>last_updated</strong> | <code>timestamp</code> | - | Sim | Data da última atualização. |\n\n---\n\n## 3. Permissões e Segurança\n\nO banco de dados roda isolado dentro da rede Docker (<code>familyos_net</code>), sem exposição pública de porta (5432) para a internet.\n\n### Conexão\nA string de conexão é montada dinamicamente via variáveis de ambiente no container da aplicação:\n<code>postgresql://{DB_USER}:{DB_PASSWORD}@familyos-db:5432/{DB_NAME}</code>\n\n---\n\n## 4. Persistência e Backup\n\nOs dados residem em um <strong>Volume Docker</strong> gerenciado (<code>postgres_data</code>).&quot;&quot;, &quot;&quot;### 🔔 Tabela: <code>reminders</code> (Novo - Sprint 9)\nSincronização bidirecional com Google Tasks.\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>google_id</strong> | <code>varchar</code> | 100 | Sim | ID da Task no Google (Sync). |\n| <strong>calendar_id</strong> | <code>varchar</code> | 100 | Sim | ID da Lista/Calendário no Google. |\n| <strong>parent_id</strong> | <code>varchar</code> | 100 | Sim | ID da tarefa pai (se subtarefa). |\n| <strong>title</strong> | <code>varchar</code> | 200 | Não | Título do lembrete. |\n| <strong>notes</strong> | <code>text</code> | - | Sim | Detalhes ou Link do Gmail. |\n| <strong>due_date</strong> | <code>timestamp</code> | - | Sim | Data de vencimento. |\n| <strong>status</strong> | <code>varchar</code> | 20 | Sim | 'needsAction' ou 'completed'. |\n| <strong>usuario</strong> | <code>varchar</code> | 50 | Sim | Origem ('Google' ou User). |\n| <strong>updated_at</strong> | <code>timestamp</code> | - | Sim | Controle de versão. |\n\n### ⛅ Tabela: <code>weather_cache</code>\nCache para evitar rate-limit da API de Clima.&quot;&quot;]&quot;,A tabela utilizada para armazenar cache de dados externos e evitar rate-limit é a tabela <code>weather_cache</code>.,&quot;A tabela weather_cache é utilizada para armazenar o JSON bruto da API externa de clima (HG Brasil), indexado pela cidade, com um timestamp da última atualização para evitar chamadas excessivas.&quot;,0.99999999995,1.0,1.0,0.8285183566981463
+Quais são os possíveis valores para a coluna 'responsavel' na tabela tasks?,&quot;[&quot;&quot;### ✅ Tabela: <code>tasks</code> (Core de Tarefas)\nGerenciamento de afazeres domésticos simples (Kanban).\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>descricao</strong> | <code>varchar</code> | 200 | Não | O que fazer. |\n| <strong>responsavel</strong> | <code>varchar</code> | 50 | Sim | 'Thiago', 'Debora', 'Casal'. |\n| <strong>prioridade</strong> | <code>integer</code> | - | Sim | 1 (Baixa) a 3 (Alta). |\n| <strong>status</strong> | <code>varchar</code> | 20 | Sim | 'pendente', 'concluido', 'arquivado'. |\n| <strong>created_at</strong> | <code>timestamp</code> | - | Sim | Data de criação. |\n\n### 🔔 Tabela: <code>reminders</code> (Novo - Sprint 9)\nSincronização bidirecional com Google Tasks.&quot;&quot;, &quot;&quot;### 🛒 Tabela: <code>lista_itens</code> (Core do Mercado)\nItens da lista de compras ativa e histórico.\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>produto_id</strong> | <code>integer</code> | - | Sim | FK para <code>produtos</code>. |\n| <strong>quantidade</strong> | <code>double</code> | - | Não | Quantidade a comprar. |\n| <strong>unidade_id</strong> | <code>integer</code> | - | Sim | FK para <code>unidades_medida</code>. |\n| <strong>usuario</strong> | <code>varchar</code> | 50 | Sim | Quem solicitou. |\n| <strong>status</strong> | <code>varchar</code> | 20 | Sim | 'pendente', 'comprado', 'finalizado'. |\n| <strong>adicionado_em</strong> | <code>timestamp</code> | - | Sim | Data de criação. |\n| <strong>origem_input</strong> | <code>varchar</code> | 100 | Sim | Fonte (ex: 'omniscient'). |\n\n### ✅ Tabela: <code>tasks</code> (Core de Tarefas)\nGerenciamento de afazeres domésticos simples (Kanban).&quot;&quot;]&quot;,&quot;Os possíveis valores para a coluna <code>responsavel</code> na tabela <code>tasks</code> são: 'Thiago', 'Debora' e 'Casal'.&quot;,&quot;Os valores possíveis listados para a coluna 'responsavel' na tabela tasks são 'Thiago', 'Debora' e 'Casal'.&quot;,0.9999999999,1.0,1.0,0.9614545913983155
+Descreva a estrutura da tabela reminders criada na Sprint 9.,&quot;[&quot;&quot;### ✅ Tabela: <code>tasks</code> (Core de Tarefas)\nGerenciamento de afazeres domésticos simples (Kanban).\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>descricao</strong> | <code>varchar</code> | 200 | Não | O que fazer. |\n| <strong>responsavel</strong> | <code>varchar</code> | 50 | Sim | 'Thiago', 'Debora', 'Casal'. |\n| <strong>prioridade</strong> | <code>integer</code> | - | Sim | 1 (Baixa) a 3 (Alta). |\n| <strong>status</strong> | <code>varchar</code> | 20 | Sim | 'pendente', 'concluido', 'arquivado'. |\n| <strong>created_at</strong> | <code>timestamp</code> | - | Sim | Data de criação. |\n\n### 🔔 Tabela: <code>reminders</code> (Novo - Sprint 9)\nSincronização bidirecional com Google Tasks.&quot;&quot;, &quot;&quot;### 🔔 Tabela: <code>reminders</code> (Novo - Sprint 9)\nSincronização bidirecional com Google Tasks.\n\n| Coluna | Tipo | Max | Null | Descrição |\n| :--- | :--- | :--- | :--- | :--- |\n| <strong>id</strong> | <code>integer</code> | - | Não | Chave Primária (PK). |\n| <strong>google_id</strong> | <code>varchar</code> | 100 | Sim | ID da Task no Google (Sync). |\n| <strong>calendar_id</strong> | <code>varchar</code> | 100 | Sim | ID da Lista/Calendário no Google. |\n| <strong>parent_id</strong> | <code>varchar</code> | 100 | Sim | ID da tarefa pai (se subtarefa). |\n| <strong>title</strong> | <code>varchar</code> | 200 | Não | Título do lembrete. |\n| <strong>notes</strong> | <code>text</code> | - | Sim | Detalhes ou Link do Gmail. |\n| <strong>due_date</strong> | <code>timestamp</code> | - | Sim | Data de vencimento. |\n| <strong>status</strong> | <code>varchar</code> | 20 | Sim | 'needsAction' ou 'completed'. |\n| <strong>usuario</strong> | <code>varchar</code> | 50 | Sim | Origem ('Google' ou User). |\n| <strong>updated_at</strong> | <code>timestamp</code> | - | Sim | Controle de versão. |\n\n### ⛅ Tabela: <code>weather_cache</code>\nCache para evitar rate-limit da API de Clima.&quot;&quot;]&quot;,&quot;A tabela <code>reminders</code>, introduzida na Sprint 9, é projetada para permitir a sincronização bidirecional com o Google Tasks. A estrutura da tabela é a seguinte:</p>
+<ul>
+<li><strong>id</strong>: Tipo <code>integer</code>, não permite valores nulos, e serve como chave primária (PK) da tabela.</li>
+<li><strong>google_id</strong>: Tipo <code>varchar</code> com um limite de 100 caracteres, permite valores nulos, e armazena o ID da tarefa correspondente no Google para fins de sincronização.</li>
+<li><strong>calendar_id</strong>: Tipo <code>varchar</code> com um limite de 100 caracteres, permite valores nulos, e armazena o ID da lista ou calendário no Google.</li>
+<li><strong>parent_id</strong>: Tipo <code>varchar</code> com um limite de 100 caracteres, permite valores nulos, e armazena o ID da tarefa pai, caso a tarefa seja uma subtarefa.</li>
+<li><strong>title</strong>: Tipo <code>varchar</code> com um limite de 200 caracteres, não permite valores nulos, e armazena o título do lembrete.</li>
+<li><strong>notes</strong>: Tipo <code>text</code>, permite valores nulos, e armazena detalhes adicionais ou links do Gmail relacionados ao lembrete.</li>
+<li><strong>due_date</strong>: Tipo <code>timestamp</code>, permite valores nulos, e armazena a data de vencimento do lembrete.</li>
+<li><strong>status</strong>: Tipo <code>varchar</code> com um limite de 20 caracteres, permite valores nulos, e indica o status do lembrete, que pode ser 'needsAction' ou 'completed'.</li>
+<li><strong>usuario</strong>: Tipo <code>varchar</code> com um limite de 50 caracteres, permite valores nulos, e indica a origem do lembrete, que pode ser 'Google' ou um usuário específico.</li>
+<li><strong>updated_at</strong>: Tipo <code>timestamp</code>, permite valores nulos, e é usado para controle de versão, registrando a última atualização do lembrete.</li>
+</ul>
+<p>Essa estrutura permite a integração e sincronização eficazes com o Google Tasks, mantendo informações detalhadas sobre cada lembrete e seu estado de sincronização.&quot;,&quot;A tabela reminders suporta a sincronização com o Google Tasks. Ela possui colunas para o ID local, google_id (para sync), calendar_id, parent_id (para subtarefas), título, notas, data de vencimento (due_date), status, usuário de origem e data de atualização.&quot;,0.49999999995,1.0,1.0,0.726555319618674
+Quais são as cores principais definidas no Design System Cyberpunk Dark Neon?,&quot;['---\n\n## 2. Design System (CSS)\n\nO sistema utiliza variáveis CSS (<code>:root</code>) para garantir consistência no tema escuro.\n\n### Paleta de Cores\n| Variável | Cor Hex | Aplicação |\n| :--- | :--- | :--- |\n| <code>--bg</code> | <code>#050509</code> | <strong>Fundo Global:</strong> Deep Void (Quase preto absoluto). |\n| <code>--glass</code> | <code>rgba(66, 79, 105, 0.25)</code> | <strong>Cards:</strong> Fundo translúcido com efeito de vidro. |\n| <code>--neon-p</code> | <code>#611af0</code> | <strong>Primary (Roxo):</strong> Bordas de destaque, foco, badges ativos. |\n| <code>--neon-g</code> | <code>#22ff7a</code> | <strong>Success (Verde):</strong> Checkboxes, Botão Salvar, Prioridade Baixa. |\n| <code>--neon-r</code> | <code>#ff3131</code> | <strong>Danger (Vermelho):</strong> Botão Limpar, Badges de Notificação, Prioridade Alta. |\n| <code>--neon-y</code> | <code>#ffb800</code> | <strong>Warning (Amarelo):</strong> Prioridade Média e <strong>Identidade Google Tasks</strong>. |', '# 🎨 FamilyOS Frontend Documentation\n\n<strong>Versão:</strong> 2.2 (Omniscient Sync)\n<strong>Stack:</strong> HTML5, Jinja2, CSS3 (Vanilla), JavaScript (Vanilla ES6)\n<strong>Design System:</strong> Cyberpunk Dark Neon\n\n---\n\n## 1. Estrutura de Navegação (Sitemap)\n\nA aplicação utiliza um layout mestre (<code>base.html</code>) com navegação inferior fixa (Tab Bar).\n\n* <strong><code>/</code> (Dashboard):</strong> Hub central. Exibe saudação, clima, frase do dia e atalhos rápidos.\n* <strong><code>/shopping</code> (Mercado):</strong> Lista de compras categorizada com edição rápida.\n* <strong><code>/tasks</code> (Tarefas):</strong> Quadro de gestão de afazeres agrupado por responsável.\n* <strong><code>/reminders</code> (Lembretes):</strong> Agenda sincronizada com Google Tasks.\n* <strong><code>/login</code>:</strong> Tela de acesso seguro.\n\n---\n\n## 2. Design System (CSS)\n\nO sistema utiliza variáveis CSS (<code>:root</code>) para garantir consistência no tema escuro.']&quot;,&quot;As cores principais definidas no Design System Cyberpunk Dark Neon são:</p>
+<ol>
+<li>
+<p><strong>Deep Void (Quase preto absoluto):</strong></p>
+<ul>
+<li>Variável: <code>--bg</code></li>
+<li>Cor Hex: <code>#050509</code></li>
+<li>Aplicação: Fundo Global</li>
+</ul>
+</li>
+<li>
+<p><strong>Roxo Neon:</strong></p>
+<ul>
+<li>Variável: <code>--neon-p</code></li>
+<li>Cor Hex: <code>#611af0</code></li>
+<li>Aplicação: Bordas de destaque, foco, badges ativos</li>
+</ul>
+</li>
+<li>
+<p><strong>Verde Neon:</strong></p>
+<ul>
+<li>Variável: <code>--neon-g</code></li>
+<li>Cor Hex: <code>#22ff7a</code></li>
+<li>Aplicação: Checkboxes, Botão Salvar, Prioridade Baixa</li>
+</ul>
+</li>
+<li>
+<p><strong>Vermelho Neon:</strong></p>
+<ul>
+<li>Variável: <code>--neon-r</code></li>
+<li>Cor Hex: <code>#ff3131</code></li>
+<li>Aplicação: Botão Limpar, Badges de Notificação, Prioridade Alta</li>
+</ul>
+</li>
+<li>
+<p><strong>Amarelo Neon:</strong></p>
+<ul>
+<li>Variável: <code>--neon-y</code></li>
+<li>Cor Hex: <code>#ffb800</code></li>
+<li>Aplicação: Prioridade Média e Identidade Google Tasks</li>
+</ul>
+</li>
+</ol>
+<p>Além disso, há uma cor translúcida com efeito de vidro:</p>
+<ul>
+<li><strong>Glass:</strong>
+<ul>
+<li>Variável: <code>--glass</code></li>
+<li>Cor: <code>rgba(66, 79, 105, 0.25)</code></li>
+<li>Aplicação: Fundo translúcido dos cards&quot;,&quot;As cores principais são: Deep Void (#050509) para o fundo global, Neon Purple (#611af0) para destaques primários, Neon Green (#22ff7a) para sucesso/baixa prioridade, Neon Red (#ff3131) para perigo/alta prioridade e Neon Yellow (#ffb800) para avisos/média prioridade e identidade do Google Tasks.&quot;,0.9999999999,1.0,1.0,0.9151370256326157
+Como funciona a funcionalidade de 'Optimistic UI' no FamilyOS?,&quot;['# 🏗️ Documento Mestre de Arquitetura: FamilyOS\n\n<strong>Versão:</strong> v2.2 (Omniscient Sync)\n<strong>Data da Revisão:</strong> 12/12/2025\n<strong>Status:</strong> ✅ Produção (Estável)\n<strong>Escopo:</strong> Gestão Doméstica Unificada &amp; Assistente Pessoal Híbrido\n\n---\n\n## 1. Visão Estratégica\n\n### 1.1. O Conceito\nO <strong>FamilyOS</strong> é um Sistema Operacional da Casa projetado para centralizar a rotina familiar (Thiago &amp; Débora). Ele atua como um hub central que orquestra dados de diferentes fontes (Google Tasks, APIs de Clima, Input de Voz) e oferece uma interface unificada e simplificada (&quot;&quot;Zero Friction&quot;&quot;).\n\n---\n\n## 2. Módulos Funcionais\n\n### 2.1. 🏠 Dashboard (Hub Central)\nO ponto de partida da aplicação.\n* <strong>Widget de Clima:</strong> Integração com HG Brasil (via Cache de Banco para evitar Rate Limit). Exibe temperatura, condição e cidade (Itajaí, SC).\n* <strong>Mensagem do Dia:</strong> Frase inspiracional ou informativa rotativa.\n* <strong>Acesso Rápido:</strong> Cards de navegação para os outros módulos com badges de contagem de pendências.', '---\n\n## 4. Funcionalidades Avançadas (JavaScript)\n\n### 4.1. Modais de Edição (Long Press)\nPara manter a interface limpa (&quot;&quot;Zero UI&quot;&quot;), as opções de edição são acessadas segurando o clique (<strong>800ms</strong>).\n\n* <strong>Geral:</strong> Todos os modais possuem fundo escuro (<code>#121216</code>), borda neon correspondente ao módulo e inputs flutuantes.\n* <strong>Modal de Mercado:</strong> Edita Nome e Categoria.\n* <strong>Modal de Tarefas:</strong> Edita Descrição, Responsável e Prioridade.\n* <strong>Modal de Lembretes:</strong>\n    * Permite editar Título, Notas, Data e Hora.\n    * Ao salvar, a alteração é enviada para o Google Tasks via n8n.\n\n### 4.2. Optimistic UI (Feedback Otimista)\nAo marcar um item ou tarefa:\n1.  O CSS aplica o estilo &quot;&quot;riscado/apagado&quot;&quot; <strong>imediatamente</strong>.\n2.  O celular vibra (<code>navigator.vibrate</code>).\n3.  A requisição <code>fetch</code> é enviada ao servidor em segundo plano.']&quot;,&quot;A funcionalidade de &quot;&quot;Optimistic UI&quot;&quot; no FamilyOS é projetada para melhorar a experiência do usuário ao fornecer feedback imediato e positivo quando uma ação é realizada, mesmo antes de a operação ser confirmada pelo servidor. Aqui está como ela funciona:</li>
+</ul>
+</li>
+</ul>
+<ol>
+<li>
+<p><strong>Feedback Visual Imediato:</strong> Assim que o usuário marca um item ou tarefa como concluída, o CSS aplica imediatamente um estilo &quot;&quot;riscado/apagado&quot;&quot; ao item. Isso dá ao usuário a impressão de que a ação foi bem-sucedida instantaneamente, sem esperar pela confirmação do servidor.</p>
+</li>
+<li>
+<p><strong>Feedback Tátil:</strong> O dispositivo vibra usando a API <code>navigator.vibrate</code>, proporcionando um feedback tátil que reforça a ação realizada pelo usuário.</p>
+</li>
+<li>
+<p><strong>Processamento em Segundo Plano:</strong> Enquanto o feedback visual e tátil é dado imediatamente, uma requisição <code>fetch</code> é enviada ao servidor em segundo plano. Isso significa que a atualização real no backend ocorre de forma assíncrona, sem interromper a interação do usuário com a interface.</p>
+</li>
+</ol>
+<p>Essa abordagem melhora a percepção de velocidade e responsividade do sistema, tornando a interação mais fluida e satisfatória para o usuário, mesmo que haja um pequeno atraso na confirmação do servidor.&quot;,&quot;Ao marcar um item, o CSS aplica imediatamente o estilo riscado/apagado e o dispositivo vibra (feedback tátil). A requisição fetch para o servidor é enviada apenas em segundo plano, garantindo uma interface responsiva sem aguardar a rede.&quot;,0.49999999995,1.0,1.0,0.9999924264638802
+O que é exibido no Dashboard (Home) do sistema?,&quot;['### Componentes Visuais\n* <strong>Glassmorphism:</strong> Uso de <code>backdrop-filter: blur(12px)</code> em headers, modais e barra de navegação.\n* <strong>Inputs &amp; Selects:</strong> Estilizados manualmente para remover a aparência nativa do navegador (branco/azul), aplicando fundo escuro (<code>rgba(255,255,255,0.05)</code>) e bordas suaves.\n* <strong>Feedback Tátil:</strong> Botões possuem <code>:active { transform: scale(0.98); }</code> para simular toque físico.\n\n---\n\n## 3. Especificação das Telas\n\n### 3.1. Dashboard (Home)\nO painel de controle da casa.\n* <strong>Header:</strong> Saudação personalizada (&quot;&quot;Olá, Thiago&quot;&quot;) + Widget de Clima em tempo real (Integração HG Brasil).\n* <strong>Daily Quote:</strong> Card de destaque com mensagem inspiracional.\n* <strong>Grid de Módulos:</strong>\n    * <strong>Mercado:</strong> Card com ícone de carrinho e <strong>Badge Vermelho</strong> (contagem de itens).\n    * <strong>Tarefas:</strong> Card com ícone de check e <strong>Badge Vermelho</strong> (tarefas pendentes).\n    * <strong>Lembretes:</strong> Card com ícone de relógio/calendário e <strong>Badge Vermelho</strong> (sincronia pendente).', '# 🎨 FamilyOS Frontend Documentation\n\n<strong>Versão:</strong> 2.2 (Omniscient Sync)\n<strong>Stack:</strong> HTML5, Jinja2, CSS3 (Vanilla), JavaScript (Vanilla ES6)\n<strong>Design System:</strong> Cyberpunk Dark Neon\n\n---\n\n## 1. Estrutura de Navegação (Sitemap)\n\nA aplicação utiliza um layout mestre (<code>base.html</code>) com navegação inferior fixa (Tab Bar).\n\n* <strong><code>/</code> (Dashboard):</strong> Hub central. Exibe saudação, clima, frase do dia e atalhos rápidos.\n* <strong><code>/shopping</code> (Mercado):</strong> Lista de compras categorizada com edição rápida.\n* <strong><code>/tasks</code> (Tarefas):</strong> Quadro de gestão de afazeres agrupado por responsável.\n* <strong><code>/reminders</code> (Lembretes):</strong> Agenda sincronizada com Google Tasks.\n* <strong><code>/login</code>:</strong> Tela de acesso seguro.\n\n---\n\n## 2. Design System (CSS)\n\nO sistema utiliza variáveis CSS (<code>:root</code>) para garantir consistência no tema escuro.']&quot;,&quot;No Dashboard (Home) do sistema, são exibidos os seguintes elementos:</p>
+<ol>
+<li>
+<p><strong>Header:</strong> Uma saudação personalizada, por exemplo, &quot;&quot;Olá, Thiago&quot;&quot;, juntamente com um widget de clima em tempo real, que é integrado com o serviço HG Brasil.</p>
+</li>
+<li>
+<p><strong>Daily Quote:</strong> Um card de destaque que apresenta uma mensagem inspiracional.</p>
+</li>
+<li>
+<p><strong>Grid de Módulos:</strong> Este grid contém vários cards, cada um com um ícone específico e um badge vermelho que indica contagens ou pendências:</p>
+<ul>
+<li><strong>Mercado:</strong> Card com um ícone de carrinho e um badge vermelho que mostra a contagem de itens.</li>
+<li><strong>Tarefas:</strong> Card com um ícone de check e um badge vermelho que indica tarefas pendentes.</li>
+<li><strong>Lembretes:</strong> Card com um ícone de relógio/calendário e um badge vermelho que sinaliza sincronia pendente.</li>
+</ul>
+</li>
+</ol>
+<p>Esses elementos compõem o painel de controle da casa, oferecendo informações e atalhos rápidos para o usuário.&quot;,&quot;O Dashboard exibe um Header com saudação personalizada e widget de clima, um Card de Destaque com uma frase diária (Daily Quote) e um Grid de Módulos (Mercado, Tarefas, Lembretes) contendo ícones e badges vermelhos com a contagem de pendências.&quot;,0.99999999995,1.0,1.0,0.7366020744159765
+Como os modais de edição são acionados na interface 'Zero UI'?,&quot;['---\n\n## 4. Funcionalidades Avançadas (JavaScript)\n\n### 4.1. Modais de Edição (Long Press)\nPara manter a interface limpa (&quot;&quot;Zero UI&quot;&quot;), as opções de edição são acessadas segurando o clique (<strong>800ms</strong>).\n\n* <strong>Geral:</strong> Todos os modais possuem fundo escuro (<code>#121216</code>), borda neon correspondente ao módulo e inputs flutuantes.\n* <strong>Modal de Mercado:</strong> Edita Nome e Categoria.\n* <strong>Modal de Tarefas:</strong> Edita Descrição, Responsável e Prioridade.\n* <strong>Modal de Lembretes:</strong>\n    * Permite editar Título, Notas, Data e Hora.\n    * Ao salvar, a alteração é enviada para o Google Tasks via n8n.\n\n### 4.2. Optimistic UI (Feedback Otimista)\nAo marcar um item ou tarefa:\n1.  O CSS aplica o estilo &quot;&quot;riscado/apagado&quot;&quot; <strong>imediatamente</strong>.\n2.  O celular vibra (<code>navigator.vibrate</code>).\n3.  A requisição <code>fetch</code> é enviada ao servidor em segundo plano.', '### 3.4. Módulo de Lembretes (Google Tasks) <strong>[NOVO]</strong>\nInterface de agenda sincronizada.\n* <strong>Identidade Visual:</strong> Bordas e detalhes em <strong>Amarelo Neon</strong> (<code>#ffb800</code>) para diferenciar dos outros módulos.\n* <strong>Reminder Card:</strong>\n    * <strong>Badge de Data:</strong> Exibe Data (DD/MM) e Hora (HH:MM) em destaque no topo do card.\n    * <strong>Título:</strong> Texto principal do compromisso.\n    * <strong>Notas:</strong> Detalhes adicionais (colapsáveis).\n    * <strong>Link:</strong> Botão &quot;&quot;Abrir no Google&quot;&quot; se houver link externo.\n* <strong>Ação Principal:</strong> Botão Flutuante/Fixo <strong>&quot;&quot;Sincronizar Agora&quot;&quot;</strong>.\n    * Ao clicar, o ícone gira (<code>fa-spin</code>) indicando comunicação com o n8n.\n    * A página recarrega automaticamente após 3 segundos para refletir a batch sync.\n\n---\n\n## 4. Funcionalidades Avançadas (JavaScript)\n\n### 4.1. Modais de Edição (Long Press)\nPara manter a interface limpa (&quot;&quot;Zero UI&quot;&quot;), as opções de edição são acessadas segurando o clique (<strong>800ms</strong>).']&quot;,&quot;Os modais de edição na interface &quot;&quot;Zero UI&quot;&quot; são acionados através de um &quot;&quot;long press&quot;&quot;, ou seja, segurando o clique por <strong>800ms</strong>. Isso permite que as opções de edição sejam acessadas sem a necessidade de botões visíveis, mantendo a interface limpa.&quot;,&quot;Os modais de edição são acionados através de um 'Long Press' (clique segurado por 800ms) no item desejado, mantendo a interface limpa de botões de edição visíveis.&quot;,0.99999999995,1.0,1.0,0.9653607400154097
+Qual é a visão estratégica e o conceito central do FamilyOS?,&quot;['# 🏗️ Documento Mestre de Arquitetura: FamilyOS\n\n<strong>Versão:</strong> v2.2 (Omniscient Sync)\n<strong>Data da Revisão:</strong> 12/12/2025\n<strong>Status:</strong> ✅ Produção (Estável)\n<strong>Escopo:</strong> Gestão Doméstica Unificada &amp; Assistente Pessoal Híbrido\n\n---\n\n## 1. Visão Estratégica\n\n### 1.1. O Conceito\nO <strong>FamilyOS</strong> é um Sistema Operacional da Casa projetado para centralizar a rotina familiar (Thiago &amp; Débora). Ele atua como um hub central que orquestra dados de diferentes fontes (Google Tasks, APIs de Clima, Input de Voz) e oferece uma interface unificada e simplificada (&quot;&quot;Zero Friction&quot;&quot;).\n\n---\n\n## 2. Módulos Funcionais\n\n### 2.1. 🏠 Dashboard (Hub Central)\nO ponto de partida da aplicação.\n* <strong>Widget de Clima:</strong> Integração com HG Brasil (via Cache de Banco para evitar Rate Limit). Exibe temperatura, condição e cidade (Itajaí, SC).\n* <strong>Mensagem do Dia:</strong> Frase inspiracional ou informativa rotativa.\n* <strong>Acesso Rápido:</strong> Cards de navegação para os outros módulos com badges de contagem de pendências.', '# 🎨 FamilyOS Frontend Documentation\n\n<strong>Versão:</strong> 2.2 (Omniscient Sync)\n<strong>Stack:</strong> HTML5, Jinja2, CSS3 (Vanilla), JavaScript (Vanilla ES6)\n<strong>Design System:</strong> Cyberpunk Dark Neon\n\n---\n\n## 1. Estrutura de Navegação (Sitemap)\n\nA aplicação utiliza um layout mestre (<code>base.html</code>) com navegação inferior fixa (Tab Bar).\n\n* <strong><code>/</code> (Dashboard):</strong> Hub central. Exibe saudação, clima, frase do dia e atalhos rápidos.\n* <strong><code>/shopping</code> (Mercado):</strong> Lista de compras categorizada com edição rápida.\n* <strong><code>/tasks</code> (Tarefas):</strong> Quadro de gestão de afazeres agrupado por responsável.\n* <strong><code>/reminders</code> (Lembretes):</strong> Agenda sincronizada com Google Tasks.\n* <strong><code>/login</code>:</strong> Tela de acesso seguro.\n\n---\n\n## 2. Design System (CSS)\n\nO sistema utiliza variáveis CSS (<code>:root</code>) para garantir consistência no tema escuro.']&quot;,&quot;A visão estratégica do FamilyOS é centralizar a rotina familiar, especificamente para Thiago e Débora, através de um Sistema Operacional da Casa. O conceito central é atuar como um hub central que orquestra dados de diferentes fontes, como Google Tasks, APIs de Clima e Input de Voz, oferecendo uma interface unificada e simplificada, descrita como &quot;&quot;Zero Friction&quot;&quot;. Isso significa que o sistema busca minimizar obstáculos e tornar a interação do usuário o mais fluida e eficiente possível.&quot;,&quot;O FamilyOS é um Sistema Operacional da Casa projetado para centralizar a rotina familiar de Thiago e Débora. Ele atua como um hub central que orquestra dados de fontes como Google Tasks e APIs de clima, oferecendo uma interface unificada e simplificada com foco em 'Zero Friction'.&quot;,0.9999999999,1.0,0.6,0.8402886498978169
+Como funciona o fluxo de sincronização entre o Google Tasks e o FamilyOS via n8n?,&quot;['---\n\n## 5. Automação e IA (O Cérebro)\n\n### 5.1. Fluxo de Sincronização (Google Tasks ↔ FamilyOS)\nPara resolver problemas de performance e timeouts, a arquitetura de sync foi refinada:\n1.  <strong>Gatilho:</strong> Cron (a cada 30min) OU Botão Manual no Front.\n2.  <strong>n8n (Extração):</strong> Node &quot;&quot;Google Tasks&quot;&quot; baixa todas as tarefas pendentes.\n3.  <strong>n8n (Agregação):</strong> Node &quot;&quot;Item Lists&quot;&quot; (Aggregate) compila as tarefas em uma única lista JSON (<code>tasks: [...]</code>).\n4.  <strong>Envio:</strong> Um único POST HTTP envia o pacote para o Python.\n5.  <strong>Python:</strong> Processa a lista, cria o que não existe, atualiza o que mudou e remove (Soft/Hard delete) o que foi concluído.', '### 2.4. 🔔 Lembretes (Google Sync) <strong>[NOVO - Sprint 9]</strong>\nMódulo de agenda e compromissos com data marcada.\n* <strong>Sincronização Bidirecional:</strong> Integração total com <strong>Google Tasks</strong> e <strong>Google Calendar</strong>.\n    * O que é criado no Google aparece no FamilyOS.\n    * O que é concluído/deletado no Google some do FamilyOS.\n* <strong>Batch Processing:</strong> O sistema recebe e processa listas inteiras de tarefas de uma só vez para alta performance.\n* <strong>Gatilho Manual:</strong> Botão &quot;&quot;Sincronizar Agora&quot;&quot; na interface que dispara o Webhook do n8n.\n\n---\n\n## 3. Arquitetura de Infraestrutura\n\nO projeto segue uma arquitetura moderna baseada em microsserviços containerizados, com fluxos distintos para desenvolvimento e produção.']&quot;,&quot;O fluxo de sincronização entre o Google Tasks e o FamilyOS via n8n é projetado para otimizar a performance e evitar problemas de timeouts. Aqui está uma descrição técnica do processo:</p>
+<ol>
+<li>
+<p><strong>Gatilho de Sincronização:</strong> O processo de sincronização pode ser iniciado de duas maneiras: automaticamente a cada 30 minutos através de um cron job ou manualmente por meio de um botão na interface do usuário (Front).</p>
+</li>
+<li>
+<p><strong>Extração de Dados (n8n):</strong> O n8n, uma ferramenta de automação de workflows, é utilizada para extrair as tarefas do Google Tasks. Isso é feito através de um node específico chamado &quot;&quot;Google Tasks&quot;&quot;, que baixa todas as tarefas pendentes.</p>
+</li>
+<li>
+<p><strong>Agregação de Dados (n8n):</strong> Após a extração, as tarefas são compiladas em uma única lista JSON usando o node &quot;&quot;Item Lists&quot;&quot; (Aggregate) do n8n. O resultado é um objeto JSON estruturado como <code>tasks: [...]</code>, que contém todas as tarefas extraídas.</p>
+</li>
+<li>
+<p><strong>Envio de Dados:</strong> A lista agregada de tarefas é então enviada para um serviço em Python através de um único POST HTTP. Este método de envio em lote (batch processing) é utilizado para melhorar a eficiência e a performance do sistema.</p>
+</li>
+<li>
+<p><strong>Processamento em Python:</strong> O serviço em Python recebe o pacote de dados e realiza várias operações:</p>
+<ul>
+<li>Cria novas tarefas no FamilyOS se elas não existirem.</li>
+<li>Atualiza tarefas existentes que tenham sido modificadas.</li>
+<li>Remove tarefas que foram concluídas, utilizando uma lógica de soft ou hard delete conforme necessário.</li>
+</ul>
+</li>
+</ol>
+<p>Este fluxo de sincronização é parte de uma arquitetura de microsserviços containerizados, permitindo que o sistema seja escalável e mantenha fluxos distintos para ambientes de desenvolvimento e produção.&quot;,&quot;O fluxo é acionado por Cron (30min) ou botão manual. O n8n baixa as tarefas pendentes do Google, agrega em uma lista JSON única e envia via POST para o Python. O Python processa a lista, criando novos itens, atualizando existentes e removendo os concluídos.&quot;,0.9999999999,1.0,0.9,0.9127164404649155
+Descreva a infraestrutura do ambiente de Produção na VPS.,&quot;['### 3.2. Ambiente de Produção (VPS)\nFocado em estabilidade e segurança.\n1.  <strong>Hospedagem:</strong> VPS Linux (CentOS/AlmaLinux).\n2.  <strong>Orquestração:</strong> <strong>Docker Compose</strong> gerenciando todo o stack na rede <code>familyos_net</code>.\n    * <code>familyos-app</code>: Container Python/Gunicorn.\n    * <code>familyos-db</code>: Container PostgreSQL 15 (Alpine).\n    * <code>n8n</code>: Orquestrador de automação.\n    * <code>traefik</code>: Reverse Proxy e Gestão de Certificados SSL (HTTPS).\n3.  <strong>Deploy:</strong> Via Git Pull (<code>origin main</code>) + Docker Build.\n4.  <strong>Integrações Externas:</strong>\n    * <strong>Google Tasks API:</strong> Via Credenciais Cloud Console (OAuth2 gerenciado pelo n8n).\n    * <strong>Google Calendar API:</strong> Via Credenciais Cloud Console (OAuth2 gerenciado pelo n8n).\n    * <strong>Google Gemini (IA):</strong> Processamento de Linguagem Natural.\n    * <strong>HG Brasil:</strong> Dados meteorológicos.\n    * <strong>OpenAI:</strong> Whisper.\n\n---\n\n## 4. Stack Tecnológico', '---\n\n## 3. Arquitetura de Infraestrutura\n\nO projeto segue uma arquitetura moderna baseada em microsserviços containerizados, com fluxos distintos para desenvolvimento e produção.\n\n### 3.1. Ambiente de Homologação (Dev Local)\nFocado em agilidade e debug.\n1.  <strong>IDE:</strong> VSCode com extensões Python/Jinja2.\n2.  <strong>Container:</strong> Docker roda apenas o <strong>PostgreSQL</strong> localmente.\n3.  <strong>Backend:</strong> O Flask (<code>app.py</code>) roda nativamente na máquina para permitir debug em tempo real.\n4.  <strong>Túnel:</strong> <strong>Ngrok</strong> expõe a porta 5000 para receber Webhooks do n8n/Telegram durante testes.\n5.  <strong>Testes de API:</strong> <strong>Postman</strong> utilizado para validar payloads JSON brutos antes da implementação no n8n.\n6.  <strong>Automação:</strong> Instância de n8n (pode ser local ou a da VPS apontando para o Ngrok).\n7.  <strong>Versionamento:</strong> Git (Branch <code>develop</code> ou <code>feature/*</code>).']&quot;,&quot;A infraestrutura do ambiente de produção na VPS é projetada para garantir estabilidade e segurança, utilizando uma abordagem moderna baseada em microsserviços containerizados. A seguir, estão os principais componentes e características desse ambiente:</p>
+<ol>
+<li>
+<p><strong>Hospedagem:</strong></p>
+<ul>
+<li>O ambiente de produção é hospedado em um VPS Linux, utilizando distribuições como CentOS ou AlmaLinux.</li>
+</ul>
+</li>
+<li>
+<p><strong>Orquestração:</strong></p>
+<ul>
+<li>A orquestração dos serviços é realizada através do Docker Compose, que gerencia todo o stack de containers na rede <code>familyos_net</code>.</li>
+<li>Os principais containers incluem:
+<ul>
+<li><code>familyos-app</code>: Um container que executa uma aplicação Python utilizando o servidor Gunicorn.</li>
+<li><code>familyos-db</code>: Um container que roda o banco de dados PostgreSQL 15, baseado na imagem Alpine para otimização de recursos.</li>
+<li><code>n8n</code>: Um orquestrador de automação que gerencia fluxos de trabalho e integrações.</li>
+<li><code>traefik</code>: Um proxy reverso que também gerencia certificados SSL para garantir conexões HTTPS seguras.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Deploy:</strong></p>
+<ul>
+<li>O processo de deploy é realizado através de um comando Git Pull (<code>origin main</code>) seguido de um Docker Build, garantindo que a aplicação esteja sempre atualizada com a última versão do código.</li>
+</ul>
+</li>
+<li>
+<p><strong>Integrações Externas:</strong></p>
+<ul>
+<li>O ambiente de produção integra-se com várias APIs externas para ampliar suas funcionalidades:
+<ul>
+<li><strong>Google Tasks API</strong> e <strong>Google Calendar API</strong>: Utilizam credenciais do Google Cloud Console e são gerenciadas pelo n8n através do OAuth2.</li>
+<li><strong>Google Gemini (IA)</strong>: Utilizado para processamento de linguagem natural.</li>
+<li><strong>HG Brasil</strong>: Fornece dados meteorológicos.</li>
+<li><strong>OpenAI Whisper</strong>: Para funcionalidades adicionais de processamento de linguagem.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p>Essa configuração permite que o ambiente de produção seja robusto, seguro e capaz de lidar com as demandas de uma aplicação moderna, enquanto mantém a flexibilidade necessária para integrar-se com serviços externos.&quot;,&quot;O ambiente de produção roda em uma VPS Linux com Docker Compose orquestrando os containers na rede 'familyos_net'. Inclui containers para a aplicação (Python/Gunicorn), banco de dados (PostgreSQL 15), n8n para automação e Traefik como Proxy Reverso e gestor de SSL.&quot;,0.9999999999,1.0,0.8695652173913043,0.7419885344094626
+Quais tecnologias compõem o stack de Front-End do projeto?,&quot;['---\n\n## 4. Stack Tecnológico\n\n### 4.1. Front-End\n* <strong>Linguagem:</strong> HTML5, CSS3 (Vanilla), JavaScript (ES6).\n* <strong>Template Engine:</strong> Jinja2 (Server-side rendering).\n* <strong>Design System:</strong> Tema &quot;&quot;Cyberpunk Dark Neon&quot;&quot;.\n    * Cores: Deep Void (<code>#050509</code>), Neon Purple (<code>#611af0</code>), Neon Green (<code>#22ff7a</code>).\n    * Componentes: Cards translúcidos (Glassmorphism), Inputs customizados, Badges dinâmicos.\n* <strong>Interatividade:</strong>\n    * <strong>Long Press (800ms):</strong> Abre modais de edição.\n    * <strong>Vibração (Haptic Feedback):</strong> Ao concluir tarefas.\n    * <strong>Optimistic UI:</strong> Atualiza a tela antes da resposta do servidor.', '---\n\n## 3. Stack Tecnológico Sugerido\n\n[cite_start]Baseado na comparação de Vector DBs[cite: 172]:\n\n| Componente | Tecnologia Sugerida | Justificativa |\n| :--- | :--- | :--- |\n| <strong>Vector DB</strong> | <strong>Chroma</strong> | [cite_start]Open Source, ideal para prototipagem média e simples de usar[cite: 173]. |\n| <strong>Embedding</strong> | <strong>text-embedding-3-small</strong> | (OpenAI) Bom balanceamento custo/performance MTEB. |\n| <strong>Orquestração</strong> | <strong>LangChain</strong> | [cite_start]Framework maduro para compor esses módulos &quot;&quot;lego&quot;&quot;[cite: 107]. |\n| <strong>Avaliação</strong> | <strong>RAGAs</strong> | [cite_start]Framework &quot;&quot;LLM-as-a-judge&quot;&quot; para medir Fidelidade e Relevância[cite: 216]. |\n\n---\n\n## 4. Plano de Implementação (Fases)\n\n1.  <strong>Fase 1 (MVP Híbrido):</strong> Implementar ChromaDB + BM25 (via LangChain EnsembleRetriever).\n2.  <strong>Fase 2 (Refinamento):</strong> Adicionar Reranker (Cross-Encoder) no pipeline.\n3.  [cite_start]<strong>Fase 3 (Qualidade):</strong> Configurar RAGAs para testar &quot;&quot;Faithfulness&quot;&quot; e &quot;&quot;Answer Relevancy&quot;&quot;[cite: 221, 225].\n\n---']&quot;,&quot;O stack de Front-End do projeto é composto pelas seguintes tecnologias:</p>
+<ul>
+<li><strong>Linguagem:</strong> HTML5, CSS3 (Vanilla), JavaScript (ES6).</li>
+<li><strong>Template Engine:</strong> Jinja2 (Server-side rendering).</li>
+<li><strong>Design System:</strong> Tema &quot;&quot;Cyberpunk Dark Neon&quot;&quot; com as cores Deep Void (<code>#050509</code>), Neon Purple (<code>#611af0</code>), Neon Green (<code>#22ff7a</code>).</li>
+<li><strong>Componentes de Design:</strong> Inclui cards translúcidos (Glassmorphism), inputs customizados e badges dinâmicos.</li>
+<li><strong>Interatividade:</strong>
+<ul>
+<li><strong>Long Press (800ms):</strong> Para abrir modais de edição.</li>
+<li><strong>Vibração (Haptic Feedback):</strong> Ao concluir tarefas.</li>
+<li><strong>Optimistic UI:</strong> Atualiza a tela antes da resposta do servidor.&quot;,&quot;O Front-End utiliza HTML5, CSS3 (Vanilla) e JavaScript (ES6), com renderização server-side via Jinja2. O design system é o 'Cyberpunk Dark Neon' com componentes translúcidos (Glassmorphism) e interatividade via Long Press e Haptic Feedback.&quot;,0.9999999999,1.0,1.0,0.8568231601565132</li>
+</ul>
+</li>
+</ul>
+
+</body>
+</html>

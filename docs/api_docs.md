@@ -1,211 +1,137 @@
 # 📡 FamilyOS API Documentation
 
-**Versão:** 2.1 (Stable - Multi-Module)
+**Versão:** 2.2 (Omniscient Sync)
 **Base URL:** `https://api.thiagoscutari.com.br`
 **Tecnologia:** Python Flask, PostgreSQL, SQLAlchemy
-**Data de Atualização:** 05/12/2025
+**Data de Atualização:** 12/12/2025
 
 ---
 
 ## 🔐 1. Autenticação e Segurança
 
-O sistema utiliza um modelo híbrido de segurança dependendo da origem da requisição.
-
 ### 1.1. Acesso Web (Frontend)
-Utiliza **Cookies de Sessão** (`session`) gerados pelo Flask-Login.
-* **Cookie Name:** `session`
-* **Propriedades:** `HttpOnly`, `Secure`, `SameSite=Lax`.
-* **Duração:** 30 dias (`REMEMBER_COOKIE_DURATION`).
-* **Proteção:** Todas as rotas (exceto `/magic` e `/login`) possuem o decorador `@login_required`.
+Utiliza **Cookies de Sessão** gerados pelo Flask-Login.
+* **Proteção:** Decorador `@login_required` em todas as rotas de visualização e ação.
+* **Sessão:** Duração de 30 dias (`REMEMBER_COOKIE_DURATION`).
+* **Segurança:** Configurado com `HttpOnly`, `Secure` e `SameSite=Lax`.
 
 ### 1.2. Acesso via n8n (Webhooks)
-As rotas de IA (`/magic` e `/tasks/magic`) são públicas para permitir o acesso via webhook do n8n sem complexidade de cookies, porém são protegidas por **obscuridade de rota** (não divulgadas publicamente).
+As rotas de processamento são públicas para permitir gatilhos externos, mas devem ser mantidas obscuras (não divulgadas).
+* **Rotas de Serviço:** `/voice/process`, `/reminders/sync`.
 
 ---
 
-## 🤖 2. Endpoints de IA (Core n8n)
+## 🧠 2. Core Intelligence (IA & Voz)
 
-Estes endpoints são chamados exclusivamente pelo orquestrador **n8n** após a transcrição do áudio.
+Endpoint central que processa linguagem natural (Gemini) para estruturar dados.
 
-### 2.1. Processar Compras
-**Rota:** `POST /magic`
-**Descrição:** Recebe texto natural, extrai itens via IA, categoriza e insere na lista de compras.
+### 2.1. Processador Omniscient (Voz/Texto)
+**Rota:** `POST /voice/process`
+**Descrição:** O "cérebro" único do sistema. Recebe texto (transcrito ou digitado), identifica a intenção (Compras, Tarefas ou Lembretes) e executa a ação correspondente.
 
 * **Headers:** `Content-Type: application/json`
 * **Corpo da Requisição (JSON):**
     ```json
     {
-      "texto": "Comprar 2 pacotes de café e sabão em pó",
+      "texto": "Lavar o carro e comprar leite",
       "usuario": "Thiago"
     }
     ```
-* **Lógica de Negócio:**
-    * **Parsing:** Ignora blocos Markdown (` ```json `) retornados pela IA.
-    * **Deduplicação:** Se o item já existe (`pendente` ou `comprado`), ele é ignorado.
-    * **Categorização:** Automática via Google Gemini.
-* **Resposta Sucesso (201 Created):**
+* **Lógica de Negócio (Gemini 2.5):**
+    1.  **Shopping:** Verifica duplicidade, categoriza e insere.
+    2.  **Tasks:** Define prioridade (1-3) e responsável (Thiago/Débora/Casal).
+    3.  **Reminders:** Cria lembrete local e dispara webhook para criar no Google Tasks.
+* **Resposta (201 Created):**
     ```json
     {
-      "message": "✅ Adicionados: Café, Sabão em pó"
-    }
-    ```
-* **Resposta Parcial (201 Created):**
-    ```json
-    {
-      "message": "✅ Adicionados: Café | ⚠️ Já na lista: Sabão em pó"
-    }
-    ```
-
-### 2.2. Processar Tarefas
-**Rota:** `POST /tasks/magic`
-**Descrição:** Recebe texto natural, extrai múltiplas tarefas, define prioridade e atribui responsável.
-
-* **Headers:** `Content-Type: application/json`
-* **Corpo da Requisição (JSON):**
-    ```json
-    {
-      "texto": "Thiago precisa lavar o carro urgente e nós vamos que jantar fora",
-      "remetente": "Débora"
-    }
-    ```
-    * *Nota:* O campo `remetente` é usado para atribuição implícita (se a frase não citar nomes).
-* **Lógica de Atribuição:**
-    * Cita nome ("Thiago", "Debora") -> Atribui direto.
-    * Cita coletivo ("Nós", "Temos") -> Atribui a "Casal".
-    * Sem citação -> Atribui ao `remetente`.
-* **Resposta Sucesso (201 Created):**
-    ```json
-    {
-      "message": "✅ Thiago: 🔴 Lavar o carro\n✅ Casal: 🟡 Jantar fora",
-      "task_id": 45
+      "message": "🛒 Compra: 📦 Leite | ✅ Tarefa (Thiago): Lavar o carro"
     }
     ```
 
 ---
 
-## 🛒 3. Módulo de Mercado (Frontend Actions)
+## 🔔 3. Módulo de Lembretes (Google Sync)
 
-Endpoints utilizados pelo JavaScript (`shopping.html`) para interatividade.
+Gerenciamento de agenda com sincronização bidirecional (Google Tasks).
 
-### 3.1. Alternar Status (Check)
+### 3.1. Sincronização em Lote (Batch Sync)
+**Rota:** `POST /reminders/sync`
+**Descrição:** Recebe uma lista de tarefas do n8n (Google Tasks) e atualiza o banco local.
+* **Lógica:** Aceita Payload Puro (Lista) ou Payload Agregado pelo n8n.
+* **Corpo da Requisição (Lista JSON):**
+    ```json
+    [
+      {
+        "id": "GTASK_ID_123",
+        "title": "Reunião",
+        "due": "2025-12-12T14:00:00.000Z",
+        "status": "needsAction",
+        "deleted": false
+      }
+    ]
+    ```
+* **Resposta (200 OK):**
+    ```json
+    {
+      "status": "success",
+      "criados": 1,
+      "atualizados": 0,
+      "deletados": 0
+    }
+    ```
+
+### 3.2. Criar Lembrete
+**Rota:** `POST /reminders/create`
+**Descrição:** Cria lembrete localmente e dispara gatilho para o n8n criar no Google.
+* **Corpo:** `{"title": "Ir ao médico", "date": "2025-12-20", "time": "10:00"}`
+
+### 3.3. Atualizar Lembrete
+**Rota:** `POST /reminders/update`
+**Descrição:** Atualiza dados locais e envia para o Google via n8n.
+* **Corpo:** `{"id": 1, "title": "Novo Título", "notes": "Detalhes..."}`
+
+### 3.4. Gatilho Manual
+**Rota:** `POST /reminders/trigger`
+**Descrição:** O botão "Sincronizar Agora" do front-end chama essa rota, que por sua vez chama o Webhook do n8n para iniciar o fluxo de sync.
+
+---
+
+## 🛒 4. Módulo de Mercado (Ações)
+
+### 4.1. Check/Uncheck Item
 **Rota:** `POST /toggle_item/<id>`
-**Descrição:** Marca ou desmarca um item como comprado.
-* **Parâmetros:** `id` (Integer) - ID do item na tabela `lista_itens`.
-* **Resposta (200 OK):**
-    ```json
-    {
-      "status": "success",
-      "novo_status": "comprado"
-    }
-    ```
+**Descrição:** Alterna status entre `pendente` e `comprado`.
 
-### 3.2. Atualizar Item
-**Rota:** `POST /update_item`
-**Descrição:** Edita nome e categoria via Modal.
-* **Corpo (JSON):**
-    ```json
-    {
-      "id": 10,
-      "nome": "Pão Francês",
-      "categoria": "PADARIA"
-    }
-    ```
-* **Resposta (200 OK):** `{"message": "OK"}`
-
-### 3.3. Arquivar Carrinho
+### 4.2. Limpar Carrinho (Arquivar)
 **Rota:** `POST /clear_cart`
-**Descrição:** Altera o status de todos os itens `comprado` para `finalizado` (Soft Delete).
-* **Resposta (200 OK):** `{"status": "success"}`
+**Descrição:** Move itens `comprado` para `finalizado`.
+
+### 4.3. Editar Item
+**Rota:** `POST /update_item`
+**Descrição:** Atualiza nome e categoria.
 
 ---
 
-## ✅ 4. Módulo de Tarefas (Frontend Actions)
+## ✅ 5. Módulo de Tarefas (Ações)
 
-Endpoints utilizados pelo JavaScript (`tasks.html`).
-
-### 4.1. Concluir Tarefa
+### 5.1. Concluir Tarefa
 **Rota:** `POST /toggle_task/<id>`
-**Descrição:** Alterna o status entre `pendente` e `concluido`.
-* **Parâmetros:** `id` (Integer) - ID na tabela `tasks`.
-* **Resposta (200 OK):**
-    ```json
-    {
-      "status": "success",
-      "novo_status": "concluido"
-    }
-    ```
+**Descrição:** Alterna status entre `pendente` e `concluido`.
 
-### 4.2. Atualizar Tarefa
-**Rota:** `POST /tasks/update`
-**Descrição:** Edita detalhes da tarefa via Modal.
-* **Corpo (JSON):**
-    ```json
-    {
-      "id": 55,
-      "descricao": "Lavar o carro",
-      "responsavel": "Thiago",
-      "prioridade": 3
-    }
-    ```
-    * *Prioridade:* 1 (Baixa/Verde), 2 (Média/Amarela), 3 (Alta/Vermelha).
-* **Resposta (200 OK):** `{"status": "success"}`
-
-### 4.3. Arquivar Tarefas
+### 5.2. Arquivar Concluídas
 **Rota:** `POST /clear_tasks`
-**Descrição:** Altera status de tarefas `concluido` para `arquivado`.
-* **Resposta (200 OK):** `{"status": "success"}`
+**Descrição:** Move tarefas `concluido` para `arquivado`.
+
+### 5.3. Editar Tarefa
+**Rota:** `POST /tasks/update`
+**Descrição:** Atualiza descrição, responsável e prioridade.
 
 ---
 
-## 🌐 5. Interfaces (Views/HTML)
+## 🌐 6. Views (Frontend)
 
-Estas rotas retornam HTML renderizado (Jinja2) para o navegador.
-
-| Rota | Template | Descrição |
-| :--- | :--- | :--- |
-| `GET /` | `dashboard.html` | **Home:** Clima, Mensagem do Dia e Botões de Acesso. |
-| `GET /shopping` | `shopping.html` | **Mercado:** Lista de compras categorizada. |
-| `GET /tasks` | `tasks.html` | **Tarefas:** Quadro Kanban agrupado por responsável. |
-| `GET /login` | `login.html` | Formulário de acesso. |
-
----
-
-## 🌍 6. APIs Externas Integradas
-
-O FamilyOS consome serviços de terceiros. As chaves ficam no arquivo `.env`.
-
-### 6.1. Google Gemini (IA)
-* **Provider:** Google AI Studio.
-* **Modelo:** `gemini-2.5-flash`.
-* **Biblioteca:** `langchain-google-genai`.
-* **Uso:** Extração de entidades (JSON) a partir de linguagem natural.
-
-### 6.2. HG Brasil (Clima)
-* **Provider:** HG Weather API.
-* **Uso:** Exibir temperatura e condições atuais no Dashboard.
-* **Otimização:** Implementado sistema de **Cache no Banco** (`WeatherCache`).
-    * A API só é chamada se o cache for mais antigo que 60 minutos.
-    * Evita bloqueio por limite de requisições (Rate Limit).
-
-
----
-# Sprint 9
-
-## ⏰ Módulo de Lembretes
-
-### `GET /reminders`
-Retorna a lista de lembretes do banco local Postgres.
-* **Filtros:** Próximos 7 dias, Atrasados.
-
-### `POST /reminders/create`
-Cria um lembrete novo.
-1.  Salva no Postgres (status 'sync_pending').
-2.  Dispara Webhook n8n para criar no Google.
-3.  Atualiza Postgres com o `google_id` retornado.
-
-### `POST /reminders/sync`
-Força uma sincronização manual (chama n8n para baixar dados do Google).
-
----
-
-**Documentação gerada automaticamente pelo Alpha Agent.**
+* `GET /` - Dashboard (Home).
+* `GET /login` - Tela de Login.
+* `GET /shopping` - Lista de Compras.
+* `GET /tasks` - Kanban de Tarefas.
+* `GET /reminders` - Lista de Lembretes.

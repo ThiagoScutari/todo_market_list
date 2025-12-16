@@ -1,0 +1,82 @@
+[
+  {
+    "source_file": "api_docs.md",
+    "question": "Explique o que faz a rota /voice/process.",
+    "ground_truth": "A rota POST /voice/process é o endpoint central de inteligência do sistema. Ela atua como um 'cérebro' que recebe texto (transcrito ou digitado), identifica a intenção do usuário (Compras, Tarefas ou Lembretes) utilizando o modelo Gemini 2.5 e executa a ação correspondente no banco de dados, retornando uma mensagem consolidada com o que foi criado."
+  },
+  {
+    "source_file": "api_docs.md",
+    "question": "Explique a lógica de negócio de cada módulo (shopping, tasks, reminders) processada pelo Gemini.",
+    "ground_truth": "Para Shopping, o sistema verifica duplicidade, categoriza o item e insere no banco. Para Tasks, ele define a prioridade (1 a 3) e o responsável (Thiago, Débora ou Casal). Para Reminders, ele cria o lembrete localmente e dispara um webhook para criar a tarefa correspondente no Google Tasks."
+  },
+  {
+    "source_file": "api_docs.md",
+    "question": "Quais são as rotas GET disponíveis no frontend?",
+    "ground_truth": "As rotas GET disponíveis são: / (Dashboard/Home), /login (Tela de Login), /shopping (Lista de Compras), /tasks (Kanban de Tarefas) e /reminders (Lista de Lembretes)."
+  },
+  {
+    "source_file": "api_docs.md",
+    "question": "Explique o funcionamento da rota de Sincronização em Lote.",
+    "ground_truth": "A rota POST /reminders/sync recebe uma lista de tarefas do n8n (Google Tasks), aceitando tanto payload puro (lista) quanto agregado. Ela processa essa lista para atualizar o banco local e retorna um JSON com o status de sucesso e a contagem de itens criados, atualizados ou deletados."
+  },
+  {
+    "source_file": "database_schema.md",
+    "question": "Explique a estrutura e função da tabela lista_itens.",
+    "ground_truth": "A tabela lista_itens é o core do módulo de mercado. Ela armazena os itens da lista de compras (ativa e histórico), contendo colunas para ID (PK), referência ao produto (FK), quantidade, unidade de medida (FK), usuário solicitante, status (pendente, comprado, finalizado), data de adição e origem do input."
+  },
+  {
+    "source_file": "database_schema.md",
+    "question": "Qual tabela é utilizada para armazenar cache de dados externos e evitar rate-limit?",
+    "ground_truth": "A tabela weather_cache é utilizada para armazenar o JSON bruto da API externa de clima (HG Brasil), indexado pela cidade, com um timestamp da última atualização para evitar chamadas excessivas."
+  },
+  {
+    "source_file": "database_schema.md",
+    "question": "Quais são os possíveis valores para a coluna 'responsavel' na tabela tasks?",
+    "ground_truth": "Os valores possíveis listados para a coluna 'responsavel' na tabela tasks são 'Thiago', 'Debora' e 'Casal'."
+  },
+  {
+    "source_file": "database_schema.md",
+    "question": "Descreva a estrutura da tabela reminders criada na Sprint 9.",
+    "ground_truth": "A tabela reminders suporta a sincronização com o Google Tasks. Ela possui colunas para o ID local, google_id (para sync), calendar_id, parent_id (para subtarefas), título, notas, data de vencimento (due_date), status, usuário de origem e data de atualização."
+  },
+  {
+    "source_file": "frontend_docs.md",
+    "question": "Quais são as cores principais definidas no Design System Cyberpunk Dark Neon?",
+    "ground_truth": "As cores principais são: Deep Void (#050509) para o fundo global, Neon Purple (#611af0) para destaques primários, Neon Green (#22ff7a) para sucesso/baixa prioridade, Neon Red (#ff3131) para perigo/alta prioridade e Neon Yellow (#ffb800) para avisos/média prioridade e identidade do Google Tasks."
+  },
+  {
+    "source_file": "frontend_docs.md",
+    "question": "Como funciona a funcionalidade de 'Optimistic UI' no FamilyOS?",
+    "ground_truth": "Ao marcar um item, o CSS aplica imediatamente o estilo riscado/apagado e o dispositivo vibra (feedback tátil). A requisição fetch para o servidor é enviada apenas em segundo plano, garantindo uma interface responsiva sem aguardar a rede."
+  },
+  {
+    "source_file": "frontend_docs.md",
+    "question": "O que é exibido no Dashboard (Home) do sistema?",
+    "ground_truth": "O Dashboard exibe um Header com saudação personalizada e widget de clima, um Card de Destaque com uma frase diária (Daily Quote) e um Grid de Módulos (Mercado, Tarefas, Lembretes) contendo ícones e badges vermelhos com a contagem de pendências."
+  },
+  {
+    "source_file": "frontend_docs.md",
+    "question": "Como os modais de edição são acionados na interface 'Zero UI'?",
+    "ground_truth": "Os modais de edição são acionados através de um 'Long Press' (clique segurado por 800ms) no item desejado, mantendo a interface limpa de botões de edição visíveis."
+  },
+  {
+    "source_file": "project_specs.md",
+    "question": "Qual é a visão estratégica e o conceito central do FamilyOS?",
+    "ground_truth": "O FamilyOS é um Sistema Operacional da Casa projetado para centralizar a rotina familiar de Thiago e Débora. Ele atua como um hub central que orquestra dados de fontes como Google Tasks e APIs de clima, oferecendo uma interface unificada e simplificada com foco em 'Zero Friction'."
+  },
+  {
+    "source_file": "project_specs.md",
+    "question": "Como funciona o fluxo de sincronização entre o Google Tasks e o FamilyOS via n8n?",
+    "ground_truth": "O fluxo é acionado por Cron (30min) ou botão manual. O n8n baixa as tarefas pendentes do Google, agrega em uma lista JSON única e envia via POST para o Python. O Python processa a lista, criando novos itens, atualizando existentes e removendo os concluídos."
+  },
+  {
+    "source_file": "project_specs.md",
+    "question": "Descreva a infraestrutura do ambiente de Produção na VPS.",
+    "ground_truth": "O ambiente de produção roda em uma VPS Linux com Docker Compose orquestrando os containers na rede 'familyos_net'. Inclui containers para a aplicação (Python/Gunicorn), banco de dados (PostgreSQL 15), n8n para automação e Traefik como Proxy Reverso e gestor de SSL."
+  },
+  {
+    "source_file": "project_specs.md",
+    "question": "Quais tecnologias compõem o stack de Front-End do projeto?",
+    "ground_truth": "O Front-End utiliza HTML5, CSS3 (Vanilla) e JavaScript (ES6), com renderização server-side via Jinja2. O design system é o 'Cyberpunk Dark Neon' com componentes translúcidos (Glassmorphism) e interatividade via Long Press e Haptic Feedback."
+  }
+]
