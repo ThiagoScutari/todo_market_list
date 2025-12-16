@@ -14,6 +14,7 @@ from langchain_openai import ChatOpenAI
 from app.extensions import db
 from app.models.shopping import ListaItem, Categoria, Produto
 from app.models.tasks import Task, Reminder
+from services.chat_processor import ChatProcessor
 
 # Import do Serviço de Chat (ajustado para nova pasta)
 try:
@@ -22,7 +23,7 @@ except ImportError:
     # Fallback caso o arquivo não tenha sido movido ainda
     print("⚠️ AVISO: chat_processor não encontrado em app.services. Tentando raiz...")
     try:
-        from chat_processor import ChatProcessor
+        from services.chat_processor import ChatProcessor
     except:
         ChatProcessor = None
         print("❌ ERRO CRÍTICO: ChatProcessor não encontrado.")
@@ -50,6 +51,8 @@ def voice_process():
     agora = datetime.datetime.now()
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
     data_hoje_iso = agora.strftime("%Y-%m-%d")
+
+    dados = {}
 
     # --- 1. Configuração da IA ---
     try:
@@ -107,43 +110,62 @@ def voice_process():
 
         SAÍDA JSON:
         """
+
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
         
+        logger.info(f"🤖 Enviando para IA: {texto_entrada[:50]}...")
+        
+        # --- CORREÇÃO DO ERRO DE VARIÁVEIS ---
         res = chain.invoke({
-            "data_atual": str_agora, 
-            "data_hoje_iso": data_hoje_iso,
+            "data_atual": str_agora,
+            "data_hoje_iso": data_hoje_iso, # <--- ESSENCIAL
             "texto": texto_entrada,
             "usuario": usuario 
         })
         
-        clean_json = re.sub(r'```json|```', '', res.content).strip()
-        dados_raw = json.loads(clean_json)
+        raw_content = res.content
+        logger.info(f"🤖 Resposta Bruta IA: {raw_content}")
+
+        # --- PARSER ---
+        clean_json = re.sub(r'```json|```', '', raw_content).strip()
         
-        # --- CORREÇÃO DO BUG (NORMALIZAÇÃO) ---
-        # Converte todas as chaves principais para minúsculo (TASKS -> tasks)
+        if not clean_json.startswith('{'):
+            match = re.search(r'\{.*\}', clean_json, re.DOTALL)
+            if match: clean_json = match.group(0)
+        
+        try:
+            dados_raw = json.loads(clean_json)
+        except json.JSONDecodeError as e_json:
+            logger.error(f"❌ Erro JSON Decode: {e_json} | Conteúdo: {clean_json}")
+            return jsonify({'erro': 'IA retornou formato inválido'}), 500
+
         dados = {k.lower(): v for k, v in dados_raw.items()}
-        
-        logger.info(f"🤖 JSON IA (Normalizado): {dados}")
 
     except Exception as e:
-        logger.error(f"⚠️ Erro IA: {e}")
-        return jsonify({'erro': 'Falha IA'}), 500
+        logger.error(f"⚠️ Erro Crítico IA: {traceback.format_exc()}")
+        return jsonify({'erro': f'Falha processamento IA: {str(e)}'}), 500
 
+    # --- 2. EXECUÇÃO ---
     logs_acao = []
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
+    
+    # Log para validar se a variável de ambiente existe
+    if not webhook_create_url:
+        logger.warning("⚠️ [ENV] N8N_WEBHOOK_TASKS não está definida ou está vazia!")
 
     try:
-        # --- A. SHOPPING ---
-        # Usa .get('shopping', []) que agora é garantido pela normalização
+        # A. SHOPPING
         for item in dados.get('shopping', []):
             nome = item.get('nome', '').lower().strip()
             if not nome: continue 
+            
+            cat_raw = item.get('cat', 'OUTROS').upper()
+            mapa_cats = {'FRUTAS': 'HORTIFRÚTI', 'LEGUMES': 'HORTIFRÚTI', 'LIMPEZA': 'LIMPEZA', 'CARNE': 'CARNES'}
+            cat_nome = mapa_cats.get(cat_raw, cat_raw)
 
-            cat_nome = item.get('cat', 'OUTROS').upper()
             cat = Categoria.query.filter_by(nome=cat_nome).first()
-            if not cat: 
-                cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
+            if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
             
             prod = Produto.query.filter_by(nome=nome).first()
             if not prod:
@@ -151,14 +173,13 @@ def voice_process():
                 db.session.add(prod); db.session.flush()
             
             existe = ListaItem.query.filter(ListaItem.produto_id == prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
-
             if not existe:
                 db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
                 logs_acao.append(f"🛒 Add: {nome}")
             else:
                 logs_acao.append(f"⚠️ Já existe: {nome}")
 
-        # --- B. TASKS ---
+        # B. TASKS
         for task in dados.get('tasks', []):
             desc = task.get('desc', '').strip()
             if not desc: continue 
@@ -166,15 +187,10 @@ def voice_process():
             resp_raw = task.get('resp', usuario).capitalize()
             # Normalização de Nomes
             r_low = resp_raw.lower()
-            
-            if 'debora' in r_low or 'débora' in r_low or 'ela' in r_low: 
-                resp = 'Debora' # Salva SEM acento no banco
-            elif 'thiago' in r_low or 'ele' in r_low: 
-                resp = 'Thiago'
-            elif 'casal' in r_low or 'nos' in r_low or 'nós' in r_low: 
-                resp = 'Casal'
-            else: 
-                resp = resp_raw # Fallback
+            if 'debora' in r_low or 'débora' in r_low or 'ela' in r_low: resp = 'Debora'
+            elif 'thiago' in r_low or 'ele' in r_low: resp = 'Thiago'
+            elif 'casal' in r_low or 'nos' in r_low or 'nós' in r_low: resp = 'Casal'
+            else: resp = resp_raw
 
             try: prio = int(task.get('prio', 1))
             except: prio = 1
@@ -183,17 +199,14 @@ def voice_process():
             if not existe:
                 db.session.add(Task(descricao=desc, responsavel=resp, prioridade=prio))
                 logs_acao.append(f"✅ Task ({resp}): {desc}")
-            else:
-                logs_acao.append(f"⚠️ Task repetida: {desc}")
 
-        # --- C. REMINDERS ---
+        # C. REMINDERS (AQUI ESTÁ O FOCO DO DEBUG)
         for rem in dados.get('reminders', []):
             title = rem.get('title', '').strip()
             if not title: continue 
-            
             date_str = rem.get('date', data_hoje_iso)
             time_str = rem.get('time')
-
+            
             if date_str:
                 try:
                     dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -209,27 +222,35 @@ def voice_process():
                     db.session.add(novo_rem); db.session.flush()
                     logs_acao.append(f"🔔 Reminder: {title}")
 
+                    # --- DEBUG N8N ---
                     if webhook_create_url:
                         payload = {"action": "create", "local_id": novo_rem.id, "title": title, "due": iso_google}
-                        requests.post(webhook_create_url, json=payload, timeout=2)
+                        logger.info(f"🚀 [CREATE] Enviando para N8N: {webhook_create_url} | Payload: {payload}")
+                        try:
+                            resp = requests.post(webhook_create_url, json=payload, timeout=5)
+                            logger.info(f"📬 [CREATE] Resposta N8N: {resp.status_code} - {resp.text}")
+                        except Exception as e_req:
+                             logger.error(f"❌ [CREATE] Erro conexao N8N: {e_req}")
+                    else:
+                        logger.warning("⚠️ [CREATE] Ignorado pois N8N_WEBHOOK_TASKS está vazio.")
+
                 except Exception as e:
-                    logger.error(f"Erro date reminder: {e}")
+                    logger.error(f"❌ Erro date reminder: {e}")
 
         db.session.commit()
-        msg_final = "\n".join(logs_acao) if logs_acao else "Sem ações."
+        msg_final = "\n".join(logs_acao) if logs_acao else "Sem ações identificadas."
         return jsonify({'message': msg_final}), 201
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Erro Geral Omni: {traceback.format_exc()}")
+        logger.error(f"Erro Geral Banco: {traceback.format_exc()}")
         return jsonify({'erro': str(e)}), 500
 
 @webhook_bp.route('/reminders/sync', methods=['POST'])
 def sync_reminders():
+    # ... (código existente mantido igual) ...
     raw_data = request.get_json()
     tasks_final = []
-    
-    # Tratamento de lista/dict e 'dados_agrupados' (N8N logic)
     raw_list = [raw_data] if isinstance(raw_data, dict) else (raw_data if isinstance(raw_data, list) else [])
     for item in raw_list:
         if isinstance(item, dict):
@@ -277,15 +298,13 @@ def sync_reminders():
 
 @webhook_bp.route('/chat/message', methods=['POST'])
 def chat_message():
+    # ... (código existente mantido igual) ...
     try:
         if not chat_brain: return jsonify({'response': "Erro: Cérebro do Chat não carregado."}), 500
-        
         data = request.json
         user_message = data.get('message', '')
         user_name = data.get('usuario', 'Thiago')
-        
         response_data = chat_brain.process_message(user_message, user_name)
-        
         if isinstance(response_data, str):
             return jsonify({'response': response_data})
         return jsonify({'response': response_data})
