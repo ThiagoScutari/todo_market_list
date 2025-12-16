@@ -165,10 +165,16 @@ def voice_process():
             
             resp_raw = task.get('resp', usuario).capitalize()
             # Normalização de Nomes
-            if 'debora' in resp_raw.lower(): resp = 'Debora'
-            elif 'thiago' in resp_raw.lower(): resp = 'Thiago'
-            elif 'casal' in resp_raw.lower(): resp = 'Casal'
-            else: resp = resp_raw
+            r_low = resp_raw.lower()
+            
+            if 'debora' in r_low or 'débora' in r_low or 'ela' in r_low: 
+                resp = 'Debora' # Salva SEM acento no banco
+            elif 'thiago' in r_low or 'ele' in r_low: 
+                resp = 'Thiago'
+            elif 'casal' in r_low or 'nos' in r_low or 'nós' in r_low: 
+                resp = 'Casal'
+            else: 
+                resp = resp_raw # Fallback
 
             try: prio = int(task.get('prio', 1))
             except: prio = 1
