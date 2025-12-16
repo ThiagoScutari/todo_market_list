@@ -42,18 +42,22 @@ def voice_process():
     if not d: return jsonify({'erro': 'JSON invalido'}), 400
     
     texto_entrada = d.get('texto', '')
-    usuario = d.get('usuario', 'Casal')
-    if not texto_entrada: return jsonify({'erro': 'Texto vazio'}), 400
+    usuario = d.get('usuario', 'Casal') 
+
+    if not texto_entrada:
+        return jsonify({'erro': 'Texto vazio'}), 400
 
     agora = datetime.datetime.now()
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
     data_hoje_iso = agora.strftime("%Y-%m-%d")
 
+    # --- 1. Configuração da IA ---
     try:
         model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash", 
             temperature=0.0, 
-            max_retries=0, timeout=10
+            max_retries=0,
+            timeout=10
         )
         
         template_str = """
@@ -105,30 +109,36 @@ def voice_process():
         """
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
+        
         res = chain.invoke({
             "data_atual": str_agora, 
-            "data_hoje_iso": data_hoje_iso, 
-            "texto": texto_entrada, 
-            "usuario": usuario
+            "texto": texto_entrada,
+            "usuario": usuario 
         })
         
         clean_json = re.sub(r'```json|```', '', res.content).strip()
-        dados = json.loads(clean_json)
-        logger.info(f"🤖 IA RAW: {dados}")
+        dados_raw = json.loads(clean_json)
+        
+        # --- CORREÇÃO DO BUG (NORMALIZAÇÃO) ---
+        # Converte todas as chaves principais para minúsculo (TASKS -> tasks)
+        dados = {k.lower(): v for k, v in dados_raw.items()}
+        
+        logger.info(f"🤖 JSON IA (Normalizado): {dados}")
 
     except Exception as e:
-        logger.error(f"Erro IA: {e}")
+        logger.error(f"⚠️ Erro IA: {e}")
         return jsonify({'erro': 'Falha IA'}), 500
 
     logs_acao = []
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
 
     try:
-        # A. SHOPPING
+        # --- A. SHOPPING ---
+        # Usa .get('shopping', []) que agora é garantido pela normalização
         for item in dados.get('shopping', []):
             nome = item.get('nome', '').lower().strip()
-            if not nome: continue
-            
+            if not nome: continue 
+
             cat_nome = item.get('cat', 'OUTROS').upper()
             cat = Categoria.query.filter_by(nome=cat_nome).first()
             if not cat: 
@@ -140,28 +150,40 @@ def voice_process():
                 db.session.add(prod); db.session.flush()
             
             existe = ListaItem.query.filter(ListaItem.produto_id == prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
+
             if not existe:
                 db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
                 logs_acao.append(f"🛒 Add: {nome}")
             else:
                 logs_acao.append(f"⚠️ Já existe: {nome}")
 
-        # B. TASKS
+        # --- B. TASKS ---
         for task in dados.get('tasks', []):
             desc = task.get('desc', '').strip()
-            if not desc: continue
-            resp = task.get('resp', usuario).capitalize()
-            prio = int(task.get('prio', 1))
+            if not desc: continue 
+            
+            resp_raw = task.get('resp', usuario).capitalize()
+            # Normalização de Nomes
+            if 'debora' in resp_raw.lower(): resp = 'Debora'
+            elif 'thiago' in resp_raw.lower(): resp = 'Thiago'
+            elif 'casal' in resp_raw.lower(): resp = 'Casal'
+            else: resp = resp_raw
+
+            try: prio = int(task.get('prio', 1))
+            except: prio = 1
 
             existe = Task.query.filter_by(descricao=desc, responsavel=resp, status='pendente').first()
             if not existe:
                 db.session.add(Task(descricao=desc, responsavel=resp, prioridade=prio))
-                logs_acao.append(f"✅ Task: {desc}")
-        
-        # C. REMINDERS
+                logs_acao.append(f"✅ Task ({resp}): {desc}")
+            else:
+                logs_acao.append(f"⚠️ Task repetida: {desc}")
+
+        # --- C. REMINDERS ---
         for rem in dados.get('reminders', []):
             title = rem.get('title', '').strip()
-            if not title: continue
+            if not title: continue 
+            
             date_str = rem.get('date', data_hoje_iso)
             time_str = rem.get('time')
 
@@ -187,11 +209,12 @@ def voice_process():
                     logger.error(f"Erro date reminder: {e}")
 
         db.session.commit()
-        return jsonify({'message': "\n".join(logs_acao) if logs_acao else "Sem ações."}), 201
+        msg_final = "\n".join(logs_acao) if logs_acao else "Sem ações."
+        return jsonify({'message': msg_final}), 201
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Erro Omni: {traceback.format_exc()}")
+        logger.error(f"Erro Geral Omni: {traceback.format_exc()}")
         return jsonify({'erro': str(e)}), 500
 
 @webhook_bp.route('/reminders/sync', methods=['POST'])
