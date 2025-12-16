@@ -32,7 +32,11 @@
 
             {% for task in lista_tarefas %}
             <div class="product-card {% if task.status == 'concluido' %}checked{% endif %}" 
-                 id="task-{{ task.id }}">
+                 id="task-{{ task.id }}"
+                 data-id="{{ task.id }}"
+                 data-desc="{{ task.descricao }}"
+                 data-resp="{{ task.responsavel }}"
+                 data-prio="{{ task.prioridade }}">
                 
                 <div class="product-info">
                     <div class="product-name" style="display:flex; align-items:center; gap:8px;">
@@ -99,7 +103,7 @@
         </div>
     </div>
 
-    {% endblock %}
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -112,14 +116,11 @@
         const card = document.getElementById('task-' + id);
         
         if (checkbox.checked) {
-            // Apenas risca, NÃO SOME MAIS
             card.classList.add('checked');
             if (navigator.vibrate) navigator.vibrate(50);
         } else {
             card.classList.remove('checked');
         }
-
-        // Chama o Backend
         fetch('/toggle_task/' + id, { method: 'POST' });
     }
 
@@ -129,16 +130,13 @@
         }
     }
 
-
-// ... (código existente de toggle e clear) ...
-
-    // LOGICA DE LONG PRESS (EDITAR)
+    // --- LÓGICA DE LONG PRESS (EDITAR) CORRIGIDA ---
     let pressTimer;
     const cards = document.querySelectorAll('.product-card');
 
     cards.forEach(card => {
         const start = (e) => {
-            if (e.target.closest('.checkbox-wrapper')) return; // Ignora clique no check
+            if (e.target.closest('.checkbox-wrapper')) return; 
             pressTimer = setTimeout(() => {
                 openTaskModal(card);
                 if (navigator.vibrate) navigator.vibrate(100);
@@ -152,34 +150,27 @@
         card.addEventListener('touchend', end);
         card.addEventListener('touchmove', end);
     });
+
     function openTaskModal(card) {
-        const id = card.id.replace('task-', '');
-        
-        // 1. Pega a descrição (texto da tarefa)
-        // O seletor .product-name pega o texto, mas precisamos limpar espaços extras
-        const descricaoElement = card.querySelector('.product-name');
-        const descricao = descricaoElement.innerText.trim();
+        // Agora lemos os dados direto do HTML (Data Attributes)
+        // Isso garante que peguemos exatamente o que está no banco
+        const id = card.dataset.id;
+        const descricao = card.dataset.desc;
+        const responsavel = card.dataset.resp;
+        const prioridade = card.dataset.prio;
 
-        // 2. Tenta descobrir quem é o responsável atual para pré-selecionar no modal
-        // Buscamos a section pai para ver em qual accordion a tarefa está
-        const section = card.closest('.category-section');
-        const headerText = section.querySelector('.category-header span').innerText;
-        
-        let responsavelAtual = "Thiago"; // Default
-        if (headerText.includes("Debora")) responsavelAtual = "Debora";
-        if (headerText.includes("Casal")) responsavelAtual = "Casal";
-
-        // 3. Preenche o formulário
+        // Popula o formulário
         document.getElementById('tid').value = id;
         document.getElementById('tdesc').value = descricao;
-        document.getElementById('tresp').value = responsavelAtual;
         
-        // Tenta adivinhar a prioridade pela cor da bolinha (opcional, ou deixa padrão 1)
-        // (Se quiser implementar depois, precisaria salvar data-priority no card)
-        
+        // O Select vai selecionar automaticamente se o value bater
+        document.getElementById('tresp').value = responsavel; 
+        document.getElementById('tprio').value = prioridade;
+
         // Abre o modal
         document.getElementById('editTaskModal').classList.add('visible');
     };
+
     // SALVAR EDIÇÃO
     document.getElementById('editTaskForm').onsubmit = async (e) => {
         e.preventDefault();

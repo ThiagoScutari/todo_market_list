@@ -57,20 +57,60 @@ def voice_process():
         )
         
         template_str = """
-        Você é o FamilyOS.
-        CONTEXTO: Data: {data_atual}, Remetente: {usuario}
-        
-        OBJETIVO: Extraia JSON estrito.
-        1. SHOPPING: Categorias (PADARIA, CARNES, ETC).
-        2. TASKS: Prio (1-3), Resp (Nome/Casal/Remetente).
-        3. REMINDERS: Se hora e sem data = HOJE.
-        
-        SAÍDA: {{ "shopping": [], "tasks": [], "reminders": [] }}
-        TEXTO: "{texto}"
+        Você é o FamilyOS, um assistente doméstico inteligente que gerencia tarefas, compras e lembretes.
+
+        CONTEXTO:
+        - Data: {data_atual}
+        - Remetente: {usuario}
+        - Regras de Atribuição:
+        1. Se a mensagem CONTÉM nome próprio (ex: "Débora", "Thiago") -> Responsável é a pessoa mencionada
+        2. Se a mensagem CONTÉM "nós", "a gente", "casal", "ambos" -> Responsável é "Casal"
+        3. Se a mensagem CONTÉM "eu", "me", "mim" -> Responsável é o remetente ({usuario})
+        4. Caso padrão -> Responsável é o remetente ({usuario})
+
+        OBJETIVO: Analisar o texto e extrair informações estruturadas em JSON.
+
+        INSTRUÇÕES DETALHADAS:
+
+        1. SHOPPING (Lista de Compras):
+        - Categorias devem estar em MAIÚSCULAS: PADARIA, HORTIFRUTI, CARNES, LATICINIOS, LIMPEZA, HIGIENE, BEBIDAS, OUTROS
+        - Cada item deve ter: nome (string), cat (categoria), qty (número, padrão: 1), emoji (opcional)
+
+        2. TASKS (Tarefas):
+        - Identificar ações que precisam ser feitas (verbos de ação: fazer, lavar, comprar, buscar, etc.)
+        - Prioridade (prio): 1=Alta, 2=Média, 3=Baixa. Use contexto para determinar.
+        - RESPONSÁVEL (resp): Aplicar regras de atribuição acima. Capitalizar nome ("Débora", "Thiago", "Casal")
+        - Cada tarefa: desc (string), resp (string), prio (1-3)
+
+        3. REMINDERS (Lembretes):
+        - Identificar eventos com data/hora específica
+        - Se mencionar hora mas não data -> assumir HOJE ({data_hoje_iso})
+        - Formato date: "YYYY-MM-DD", time: "HH:MM"
+        - Cada lembrete: title (string), date (string opcional), time (string opcional), notes (string opcional)
+
+        SAÍDA ESTRITA:
+        - Apenas JSON válido
+        - Sem explicações, sem markdown
+        - Arrays vazios se não houver elementos
+
+        EXEMPLOS DE ATRIBUIÇÃO:
+        - "Débora, buscar a Catharina na escola" → resp: "Débora"
+        - "Thiago precisa lavar o carro" → resp: "Thiago"
+        - "Nós precisamos organizar a garagem" → resp: "Casal"
+        - "Comprar leite" → resp: "{usuario}" (remetente padrão)
+
+        TEXTO PARA ANALISAR: "{texto}"
+
+        SAÍDA JSON:
         """
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
-        res = chain.invoke({"data_atual": str_agora, "texto": texto_entrada, "usuario": usuario})
+        res = chain.invoke({
+            "data_atual": str_agora, 
+            "data_hoje_iso": data_hoje_iso, 
+            "texto": texto_entrada, 
+            "usuario": usuario
+        })
         
         clean_json = re.sub(r'```json|```', '', res.content).strip()
         dados = json.loads(clean_json)

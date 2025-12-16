@@ -169,14 +169,16 @@ services:
     container_name: familyos_app
     build: ./familyos
     restart: always
-    command: gunicorn -w 1 -b 0.0.0.0:5000 --access-logfile - --error-logfile - --log-level info src.app:app
+    # ATENÇÃO: Mudamos para run:app
+    command: gunicorn -w 1 -b 0.0.0.0:5000 --access-logfile - --error-logfile - --log-level info run:app
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}      
       - TZ=America/Sao_Paulo
     volumes:
-      - ./familyos/src:/app/src
+      - ./familyos:/app
     networks:
       app_network:
         aliases:

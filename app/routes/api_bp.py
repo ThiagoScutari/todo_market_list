@@ -1,12 +1,17 @@
+import os
+import datetime
+import requests
+import traceback
+import logging
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.shopping import ListaItem, Categoria, Produto
 from app.models.tasks import Task, Reminder
-import datetime
-import requests
-import os
-import traceback
+
+# Configuração de Logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 api_bp = Blueprint('api', __name__)
 
@@ -89,7 +94,7 @@ def update_task():
     db.session.commit()
     return jsonify({'status': 'success'})
 
-# --- REMINDERS API ---
+# --- REMINDERS API (COM LOGS DE DEBUG) ---
 
 @api_bp.route('/reminders/update', methods=['POST'])
 @login_required
@@ -132,9 +137,13 @@ def update_reminder():
                 "notes": reminder.notes
             }
             if iso_date_for_google: payload["due"] = iso_date_for_google
-            requests.post(webhook_url, json=payload, timeout=2)
+            
+            logger.info(f"🚀 [UPDATE] Enviando para N8N: {webhook_url} | Payload: {payload}")
+            resp = requests.post(webhook_url, json=payload, timeout=5)
+            logger.info(f"📬 [UPDATE] Resposta N8N: {resp.status_code} - {resp.text}")
+            
     except Exception as e:
-        print(f"Erro N8N Update: {e}")
+        logger.error(f"❌ [UPDATE] Erro N8N: {e}")
 
     return jsonify({'status': 'success'})
 
@@ -162,6 +171,7 @@ def create_reminder():
         except ValueError: pass
 
     try:
+        # 1. Cria Localmente
         novo_lembrete = Reminder(
             title=title, notes=notes, due_date=dt_final,
             status='needsAction', usuario=d.get('usuario', 'API')
@@ -169,14 +179,19 @@ def create_reminder():
         db.session.add(novo_lembrete)
         db.session.commit()
 
+        # 2. Chama N8N
         webhook_url = os.getenv('N8N_WEBHOOK_TASKS') 
         if webhook_url:
             payload = {
                 "action": "create", "local_id": novo_lembrete.id,
                 "title": title, "notes": notes, "due": iso_google
             }
-            try: requests.post(webhook_url, json=payload, timeout=2)
-            except: pass
+            try: 
+                logger.info(f"🚀 [CREATE] Enviando para N8N: {webhook_url}")
+                resp = requests.post(webhook_url, json=payload, timeout=5)
+                logger.info(f"📬 [CREATE] Resposta N8N: {resp.status_code} - {resp.text}")
+            except Exception as e_req: 
+                 logger.error(f"❌ [CREATE] Falha Request N8N: {e_req}")
 
         return jsonify({'status': 'success', 'id': novo_lembrete.id, 'message': f'Lembrete "{title}" criado.'}), 201
 
@@ -187,13 +202,27 @@ def create_reminder():
 @api_bp.route('/reminders/trigger', methods=['POST'])
 @login_required
 def trigger_manual_sync():
+    """Rota chamada pelo Botão 'Sincronizar' do Frontend"""
     webhook_url = os.getenv('N8N_WEBHOOK_REMINDERS')
-    if not webhook_url: return jsonify({"status": "error", "message": "Sem config N8N"}), 500
+    
+    if not webhook_url: 
+        logger.error("❌ [TRIGGER] Erro: Var N8N_WEBHOOK_REMINDERS não definida")
+        return jsonify({"status": "error", "message": "Sem config N8N"}), 500
 
     try:
         payload = {"trigger": "manual_button", "requested_by": current_user.username}
-        try: requests.post(webhook_url, json=payload, timeout=2)
-        except: pass
+        logger.info(f"🚀 [TRIGGER] Solicitando Sync manual para: {webhook_url}")
+        
+        # Timeout curto (2s) porque não precisamos esperar o N8N terminar
+        try: 
+            requests.post(webhook_url, json=payload, timeout=2)
+            logger.info("✅ [TRIGGER] Solicitação enviada com sucesso (Fire & Forget)")
+        except requests.exceptions.ReadTimeout:
+            logger.info("✅ [TRIGGER] Enviado (Timeout esperado)")
+        except Exception as req_err:
+            logger.error(f"⚠️ [TRIGGER] Erro de conexão: {req_err}")
+
         return jsonify({"status": "success", "message": "Sync solicitado!"}), 200
     except Exception as e:
+        logger.error(f"❌ [TRIGGER] Erro crítico: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
