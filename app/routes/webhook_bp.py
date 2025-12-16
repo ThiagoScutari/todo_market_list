@@ -112,6 +112,7 @@ def voice_process():
         
         res = chain.invoke({
             "data_atual": str_agora, 
+            "data_hoje_iso": data_hoje_iso,
             "texto": texto_entrada,
             "usuario": usuario 
         })
