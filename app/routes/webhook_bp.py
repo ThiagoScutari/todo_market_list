@@ -15,17 +15,17 @@ from app.extensions import db
 from app.models.shopping import ListaItem, Categoria, Produto
 from app.models.tasks import Task, Reminder
 
-# Import do Serviço de Chat (ajustado para nova pasta)
-try:
-    from app.services.chat_processor import ChatProcessor
-except ImportError:
-    # Fallback caso o arquivo não tenha sido movido ainda
-    print("⚠️ AVISO: chat_processor não encontrado em app.services. Tentando raiz...")
-    try:
-        from chat_processor import ChatProcessor
-    except:
-        ChatProcessor = None
-        print("❌ ERRO CRÍTICO: ChatProcessor não encontrado.")
+# # Import do Serviço de Chat (ajustado para nova pasta)
+# try:
+#     from app.services.chat_processor import ChatProcessor
+# except ImportError:
+#     # Fallback caso o arquivo não tenha sido movido ainda
+#     print("⚠️ AVISO: chat_processor não encontrado em app.services. Tentando raiz...")
+#     try:
+#         from chat_processor import ChatProcessor
+#     except:
+#         ChatProcessor = None
+#         print("❌ ERRO CRÍTICO: ChatProcessor não encontrado.")
 
 webhook_bp = Blueprint('webhook', __name__)
 logger = logging.getLogger(__name__)
