@@ -73,46 +73,62 @@ def voice_process():
         CONTEXTO:
         - Data: {data_atual}
         - Remetente: {usuario}
-        - Regras de Atribuição:
-        1. Se a mensagem CONTÉM nome próprio (ex: "Débora", "Thiago") -> Responsável é a pessoa mencionada
-        2. Se a mensagem CONTÉM "nós", "a gente", "casal", "ambos" -> Responsável é "Casal"
-        3. Se a mensagem CONTÉM "eu", "me", "mim" -> Responsável é o remetente ({usuario})
-        4. Caso padrão -> Responsável é o remetente ({usuario})
+        - Regras de Atribuição PRIORITÁRIAS:
+        1. Se a mensagem CONTÉM nome próprio seguido de vírgula no início (ex: "Débora, ...") -> Responsável é a pessoa mencionada
+        2. Se a mensagem CONTÉM "[Nome] precisa..." ou "[Nome] tem que..." -> Responsável é a pessoa mencionada
+        3. Se a mensagem CONTÉM "para [Nome]" ou "de [Nome]" (posse) -> NÃO MUDAR responsável, mantenha lógica abaixo
+        4. Se a mensagem CONTÉM "nós", "a gente", "casal", "ambos" -> Responsável é "Casal"
+        5. Se a mensagem CONTÉM "eu", "me", "mim" ou é uma ação direta -> Responsável é o remetente ({usuario})
+        6. Caso padrão -> Responsável é o remetente ({usuario})
+
+        ANÁLISE SEMÂNTICA CRÍTICA:
+        - "Buscar remédio da Débora" = Buscar (remédio que pertence à Débora) → Ação executada POR {usuario}
+        - "Débora precisa buscar remédio" = Ação executada POR Débora
+        - "Lavar roupa de Thiago" = Lavar (roupa de Thiago) → Ação executada POR {usuario}
+        - "Thiago precisa lavar roupa" = Ação executada POR Thiago
 
         OBJETIVO: Analisar o texto e extrair informações estruturadas em JSON.
 
         INSTRUÇÕES DETALHADAS:
 
         1. SHOPPING (Lista de Compras):
-        - Categorias devem estar em MAIÚSCULAS: PADARIA, HORTIFRUTI, CARNES, LATICINIOS, LIMPEZA, HIGIENE, BEBIDAS, OUTROS
-        - Cada item deve ter: nome (string), cat (categoria), qty (número, padrão: 1), emoji (opcional)
+        - Categorias: PADARIA, HORTIFRUTI, CARNES, LATICINIOS, LIMPEZA, HIGIENE, BEBIDAS, OUTROS
+        - Cada item: nome (string), cat (categoria), qty (número, padrão: 1), emoji (opcional)
 
         2. TASKS (Tarefas):
-        - Identificar ações que precisam ser feitas (verbos de ação: fazer, lavar, comprar, buscar, etc.)
-        - Prioridade (prio): 1=Alta, 2=Média, 3=Baixa. Use contexto para determinar.
-        - RESPONSÁVEL (resp): Aplicar regras de atribuição acima. Capitalizar nome ("Débora", "Thiago", "Casal")
-        - Cada tarefa: desc (string), resp (string), prio (1-3)
+        - Identificar VERBOS PRINCIPAIS que indicam ação: buscar, fazer, lavar, comprar, organizar, etc.
+        - RESPONSÁVEL (resp): Aplicar regras prioritárias acima corretamente
+        - Prioridade (prio): 
+            1=Alta (urgente, com hora específica, saúde, compromissos)
+            2=Média (importante mas não urgente)
+            3=Baixa (quando quiser, sem pressa)
+        - Formato: desc (string clara), resp (string), prio (1-3)
 
         3. REMINDERS (Lembretes):
-        - Identificar eventos com data/hora específica
+        - SOMENTE se mencionar data/hora específica (hoje, amanhã, dia X, às HH:MM)
         - Se mencionar hora mas não data -> assumir HOJE ({data_hoje_iso})
-        - Formato date: "YYYY-MM-DD", time: "HH:MM"
-        - Cada lembrete: title (string), date (string opcional), time (string opcional), notes (string opcional)
+        - Se for um compromisso pontual com horário -> criar REMINDER
+        - Se for uma tarefa sem horário específico -> criar TASK
+        - Formato: date "YYYY-MM-DD", time "HH:MM"
+        - Cada lembrete: title (string), date (string), time (string), notes (string opcional)
 
-        SAÍDA ESTRITA:
-        - Apenas JSON válido
-        - Sem explicações, sem markdown
-        - Arrays vazios se não houver elementos
+        REGRAS DE CLASSIFICAÇÃO:
+        - "Buscar remédio da Débora às 17:15" → REMINDER (tem hora específica)
+        - "Buscar remédio da Débora" (sem hora) → TASK
+        - "Comprar pão" → TASK (sem hora)
+        - "Reunião amanhã às 10:00" → REMINDER
 
-        EXEMPLOS DE ATRIBUIÇÃO:
-        - "Débora, buscar a Catharina na escola" → resp: "Débora"
-        - "Thiago precisa lavar o carro" → resp: "Thiago"
-        - "Nós precisamos organizar a garagem" → resp: "Casal"
-        - "Comprar leite" → resp: "{usuario}" (remetente padrão)
+        EXEMPLOS DE ATRIBUIÇÃO CORRETA:
+        - "Débora, buscar a Catharina na escola" → resp: "Débora" (nome no início + vírgula)
+        - "Buscar remédio da Débora" → resp: "{usuario}" (ação DO remetente PARA Débora)
+        - "Thiago precisa lavar o carro" → resp: "Thiago" ([Nome] + precisa)
+        - "Lavar roupa de Thiago" → resp: "{usuario}" (ação DO remetente)
+        - "Nós temos reunião amanhã" → resp: "Casal" (nós/ambos)
+        - "Preciso ir ao mercado" → resp: "{usuario}" (eu/preciso)
 
         TEXTO PARA ANALISAR: "{texto}"
 
-        SAÍDA JSON:
+        SAÍDA APENAS JSON (sem markdown, sem explicações):
         """
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
