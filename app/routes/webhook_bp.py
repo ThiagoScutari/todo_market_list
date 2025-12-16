@@ -15,24 +15,30 @@ from app.extensions import db
 from app.models.shopping import ListaItem, Categoria, Produto
 from app.models.tasks import Task, Reminder
 
-# # Import do Serviço de Chat (ajustado para nova pasta)
-# try:
-#     from app.services.chat_processor import ChatProcessor
-# except ImportError:
-#     # Fallback caso o arquivo não tenha sido movido ainda
-#     print("⚠️ AVISO: chat_processor não encontrado em app.services. Tentando raiz...")
-#     try:
-#         from chat_processor import ChatProcessor
-#     except:
-#         ChatProcessor = None
-#         print("❌ ERRO CRÍTICO: ChatProcessor não encontrado.")
-
-webhook_bp = Blueprint('webhook', __name__)
+# --- CONFIGURAÇÃO DE LOGS ---
 logger = logging.getLogger(__name__)
+webhook_bp = Blueprint('webhook', __name__)
 
-# --- INICIALIZAÇÃO DA IA (Singleton simples) ---
-llm_model = ChatOpenAI(model="gpt-4o", temperature=0.2)
-chat_brain = ChatProcessor(llm_model) if ChatProcessor else None
+# --- IMPORT DO CHAT PROCESSOR (BLINDADO) ---
+# Tenta importar do caminho absoluto correto
+try:
+    from app.services.chat_processor import ChatProcessor
+    logger.info("✅ ChatProcessor importado com sucesso.")
+except ImportError as e:
+    logger.error(f"❌ Erro ao importar ChatProcessor: {e}")
+    ChatProcessor = None
+
+# --- INICIALIZAÇÃO DA IA ---
+# Só inicializa se a classe foi importada
+if ChatProcessor:
+    try:
+        llm_model = ChatOpenAI(model="gpt-4o", temperature=0.2)
+        chat_brain = ChatProcessor(llm_model)
+    except Exception as e:
+        logger.error(f"❌ Erro ao instanciar ChatProcessor: {e}")
+        chat_brain = None
+else:
+    chat_brain = None
 
 # --- ROTAS ---
 
@@ -44,22 +50,21 @@ def voice_process():
     texto_entrada = d.get('texto', '')
     usuario = d.get('usuario', 'Casal') 
 
-    if not texto_entrada:
-        return jsonify({'erro': 'Texto vazio'}), 400
+    if not texto_entrada: return jsonify({'erro': 'Texto vazio'}), 400
 
+    # Variáveis de Tempo
     agora = datetime.datetime.now()
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
     data_hoje_iso = agora.strftime("%Y-%m-%d")
 
-    dados = {}
+    dados = {} 
 
-    # --- 1. Configuração da IA ---
     try:
         model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash", 
             temperature=0.0, 
-            max_retries=0,
-            timeout=10
+            max_retries=2, 
+            timeout=15     
         )
         
         template_str = """
@@ -109,16 +114,14 @@ def voice_process():
 
         SAÍDA JSON:
         """
-
         prompt = ChatPromptTemplate.from_template(template_str)
         chain = prompt | model
         
         logger.info(f"🤖 Enviando para IA: {texto_entrada[:50]}...")
         
-        # --- CORREÇÃO DO ERRO DE VARIÁVEIS ---
         res = chain.invoke({
             "data_atual": str_agora,
-            "data_hoje_iso": data_hoje_iso, # <--- ESSENCIAL
+            "data_hoje_iso": data_hoje_iso,
             "texto": texto_entrada,
             "usuario": usuario 
         })
@@ -149,7 +152,6 @@ def voice_process():
     logs_acao = []
     webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
     
-    # Log para validar se a variável de ambiente existe
     if not webhook_create_url:
         logger.warning("⚠️ [ENV] N8N_WEBHOOK_TASKS não está definida ou está vazia!")
 
@@ -184,7 +186,6 @@ def voice_process():
             if not desc: continue 
             
             resp_raw = task.get('resp', usuario).capitalize()
-            # Normalização de Nomes
             r_low = resp_raw.lower()
             if 'debora' in r_low or 'débora' in r_low or 'ela' in r_low: resp = 'Debora'
             elif 'thiago' in r_low or 'ele' in r_low: resp = 'Thiago'
@@ -199,7 +200,7 @@ def voice_process():
                 db.session.add(Task(descricao=desc, responsavel=resp, prioridade=prio))
                 logs_acao.append(f"✅ Task ({resp}): {desc}")
 
-        # C. REMINDERS (AQUI ESTÁ O FOCO DO DEBUG)
+        # C. REMINDERS
         for rem in dados.get('reminders', []):
             title = rem.get('title', '').strip()
             if not title: continue 
@@ -230,8 +231,6 @@ def voice_process():
                             logger.info(f"📬 [CREATE] Resposta N8N: {resp.status_code} - {resp.text}")
                         except Exception as e_req:
                              logger.error(f"❌ [CREATE] Erro conexao N8N: {e_req}")
-                    else:
-                        logger.warning("⚠️ [CREATE] Ignorado pois N8N_WEBHOOK_TASKS está vazio.")
 
                 except Exception as e:
                     logger.error(f"❌ Erro date reminder: {e}")
@@ -247,7 +246,7 @@ def voice_process():
 
 @webhook_bp.route('/reminders/sync', methods=['POST'])
 def sync_reminders():
-    # ... (código existente mantido igual) ...
+    # ... Lógica de sync mantida ...
     raw_data = request.get_json()
     tasks_final = []
     raw_list = [raw_data] if isinstance(raw_data, dict) else (raw_data if isinstance(raw_data, list) else [])
@@ -297,9 +296,8 @@ def sync_reminders():
 
 @webhook_bp.route('/chat/message', methods=['POST'])
 def chat_message():
-    # ... (código existente mantido igual) ...
     try:
-        if not chat_brain: return jsonify({'response': "Erro: Cérebro do Chat não carregado."}), 500
+        if not chat_brain: return jsonify({'response': "Erro: Cérebro do Chat não carregado (Ver logs)."}), 500
         data = request.json
         user_message = data.get('message', '')
         user_name = data.get('usuario', 'Thiago')
