@@ -14,7 +14,6 @@ from langchain_openai import ChatOpenAI
 from app.extensions import db
 from app.models.shopping import ListaItem, Categoria, Produto
 from app.models.tasks import Task, Reminder
-from services.chat_processor import ChatProcessor
 
 # Import do Serviço de Chat (ajustado para nova pasta)
 try:
@@ -23,7 +22,7 @@ except ImportError:
     # Fallback caso o arquivo não tenha sido movido ainda
     print("⚠️ AVISO: chat_processor não encontrado em app.services. Tentando raiz...")
     try:
-        from services.chat_processor import ChatProcessor
+        from chat_processor import ChatProcessor
     except:
         ChatProcessor = None
         print("❌ ERRO CRÍTICO: ChatProcessor não encontrado.")
