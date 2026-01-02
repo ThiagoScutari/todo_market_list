@@ -376,6 +376,63 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     box-shadow: 0 0 10px rgba(255, 49, 49, 0.2);
 }
 
+/* --- CONTROLE DE QUANTIDADE (Stepper) --- */
+.qty-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    justify-content: center; /* Centraliza no modal */
+    background: rgba(255, 255, 255, 0.02);
+    padding: 10px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.qty-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.qty-btn:active {
+    background: var(--neon-p);
+    border-color: var(--neon-p);
+    transform: scale(0.95);
+}
+
+.qty-input {
+    width: 60px !important; /* Sobrescreve regra geral de input */
+    text-align: center;
+    font-size: 1.4rem !important;
+    font-weight: 700;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--neon-g) !important; /* Verde Matrix */
+}
+
+/* Remove setas do input number (Chrome/Safari/Edge) */
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Remove setas do input number (Firefox) */
+.qty-input[type=number] {
+  -moz-appearance: textfield;
+}
+
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
