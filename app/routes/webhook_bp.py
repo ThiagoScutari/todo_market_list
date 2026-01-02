@@ -19,26 +19,19 @@ from app.models.tasks import Task, Reminder
 logger = logging.getLogger(__name__)
 webhook_bp = Blueprint('webhook', __name__)
 
-# --- IMPORT DO CHAT PROCESSOR (BLINDADO) ---
-# Tenta importar do caminho absoluto correto
+# --- CONFIGURAÇÃO DA IA ---
+# Instancia aqui para evitar recriação a cada request (Singleton pattern simples)
 try:
-    from app.services.chat_processor import ChatProcessor
-    logger.info("✅ ChatProcessor importado com sucesso.")
-except ImportError as e:
-    logger.error(f"❌ Erro ao importar ChatProcessor: {e}")
-    ChatProcessor = None
-
-# --- INICIALIZAÇÃO DA IA ---
-# Só inicializa se a classe foi importada
-if ChatProcessor:
-    try:
-        llm_model = ChatOpenAI(model="gpt-4o", temperature=0.2)
-        chat_brain = ChatProcessor(llm_model)
-    except Exception as e:
-        logger.error(f"❌ Erro ao instanciar ChatProcessor: {e}")
-        chat_brain = None
-else:
-    chat_brain = None
+    llm_gemini = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", 
+        temperature=0.0, 
+        max_retries=2, 
+        timeout=15     
+    )
+    logger.info("✅ Google Gemini inicializado para Webhook.")
+except Exception as e:
+    logger.error(f"❌ Erro ao instanciar Gemini: {e}")
+    llm_gemini = None
 
 # --- ROTAS ---
 
@@ -51,214 +44,194 @@ def voice_process():
     usuario = d.get('usuario', 'Casal') 
 
     if not texto_entrada: return jsonify({'erro': 'Texto vazio'}), 400
+    if not llm_gemini: return jsonify({'erro': 'IA indisponível'}), 503
 
     # Variáveis de Tempo
     agora = datetime.datetime.now()
     str_agora = agora.strftime("%Y-%m-%d %H:%M Semana: %A")
     data_hoje_iso = agora.strftime("%Y-%m-%d")
 
-    dados = {} 
-
     try:
-        model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", 
-            temperature=0.0, 
-            max_retries=2, 
-            timeout=15     
-        )
+        # 1. INTELIGÊNCIA: Extração de Dados
+        dados_json = _call_ai_extraction(texto_entrada, usuario, str_agora, data_hoje_iso)
         
-        template_str = """
-        Você é o FamilyOS, um assistente doméstico inteligente que gerencia tarefas, compras e lembretes.
-
-        CONTEXTO:
-        - Data: {data_atual}
-        - Remetente: {usuario}
-        - Regras de Atribuição PRIORITÁRIAS:
-        1. Se a mensagem CONTÉM nome próprio seguido de vírgula no início (ex: "Débora, ...") -> Responsável é a pessoa mencionada
-        2. Se a mensagem CONTÉM "[Nome] precisa..." ou "[Nome] tem que..." -> Responsável é a pessoa mencionada
-        3. Se a mensagem CONTÉM "para [Nome]" ou "de [Nome]" (posse) -> NÃO MUDAR responsável, mantenha lógica abaixo
-        4. Se a mensagem CONTÉM "nós", "a gente", "casal", "ambos" -> Responsável é "Casal"
-        5. Se a mensagem CONTÉM "eu", "me", "mim" ou é uma ação direta -> Responsável é o remetente ({usuario})
-        6. Caso padrão -> Responsável é o remetente ({usuario})
-
-        ANÁLISE SEMÂNTICA CRÍTICA:
-        - "Buscar remédio da Débora" = Buscar (remédio que pertence à Débora) → Ação executada POR {usuario}
-        - "Débora precisa buscar remédio" = Ação executada POR Débora
-        - "Lavar roupa de Thiago" = Lavar (roupa de Thiago) → Ação executada POR {usuario}
-        - "Thiago precisa lavar roupa" = Ação executada POR Thiago
-
-        OBJETIVO: Analisar o texto e extrair informações estruturadas em JSON.
-
-        INSTRUÇÕES DETALHADAS:
-
-        1. SHOPPING (Lista de Compras):
-        - Categorias: PADARIA, HORTIFRUTI, CARNES, LATICINIOS, LIMPEZA, HIGIENE, BEBIDAS, OUTROS
-        - Cada item: nome (string), cat (categoria), qty (número, padrão: 1), emoji (opcional)
-
-        2. TASKS (Tarefas):
-        - Identificar VERBOS PRINCIPAIS que indicam ação: buscar, fazer, lavar, comprar, organizar, etc.
-        - RESPONSÁVEL (resp): Aplicar regras prioritárias acima corretamente
-        - Prioridade (prio): 
-            1=Alta (urgente, com hora específica, saúde, compromissos)
-            2=Média (importante mas não urgente)
-            3=Baixa (quando quiser, sem pressa)
-        - Formato: desc (string clara), resp (string), prio (1-3)
-
-        3. REMINDERS (Lembretes):
-        - SOMENTE se mencionar data/hora específica (hoje, amanhã, dia X, às HH:MM)
-        - Se mencionar hora mas não data -> assumir HOJE ({data_hoje_iso})
-        - Se for um compromisso pontual com horário -> criar REMINDER
-        - Se for uma tarefa sem horário específico -> criar TASK
-        - Formato: date "YYYY-MM-DD", time "HH:MM"
-        - Cada lembrete: title (string), date (string), time (string), notes (string opcional)
-
-        REGRAS DE CLASSIFICAÇÃO:
-        - "Buscar remédio da Débora às 17:15" → REMINDER (tem hora específica)
-        - "Buscar remédio da Débora" (sem hora) → TASK
-        - "Comprar pão" → TASK (sem hora)
-        - "Reunião amanhã às 10:00" → REMINDER
-
-        EXEMPLOS DE ATRIBUIÇÃO CORRETA:
-        - "Débora, buscar a Catharina na escola" → resp: "Débora" (nome no início + vírgula)
-        - "Buscar remédio da Débora" → resp: "{usuario}" (ação DO remetente PARA Débora)
-        - "Thiago precisa lavar o carro" → resp: "Thiago" ([Nome] + precisa)
-        - "Lavar roupa de Thiago" → resp: "{usuario}" (ação DO remetente)
-        - "Nós temos reunião amanhã" → resp: "Casal" (nós/ambos)
-        - "Preciso ir ao mercado" → resp: "{usuario}" (eu/preciso)
-
-        TEXTO PARA ANALISAR: "{texto}"
-
-        SAÍDA APENAS JSON (sem markdown, sem explicações):
-        """
-        prompt = ChatPromptTemplate.from_template(template_str)
-        chain = prompt | model
+        # 2. ROTEAMENTO E EXECUÇÃO (Dividir e Conquistar)
+        logs_acao = []
         
-        logger.info(f"🤖 Enviando para IA: {texto_entrada[:50]}...")
-        
-        res = chain.invoke({
-            "data_atual": str_agora,
-            "data_hoje_iso": data_hoje_iso,
-            "texto": texto_entrada,
-            "usuario": usuario 
-        })
-        
-        raw_content = res.content
-        logger.info(f"🤖 Resposta Bruta IA: {raw_content}")
-
-        # --- PARSER ---
-        clean_json = re.sub(r'```json|```', '', raw_content).strip()
-        
-        if not clean_json.startswith('{'):
-            match = re.search(r'\{.*\}', clean_json, re.DOTALL)
-            if match: clean_json = match.group(0)
-        
-        try:
-            dados_raw = json.loads(clean_json)
-        except json.JSONDecodeError as e_json:
-            logger.error(f"❌ Erro JSON Decode: {e_json} | Conteúdo: {clean_json}")
-            return jsonify({'erro': 'IA retornou formato inválido'}), 500
-
-        dados = {k.lower(): v for k, v in dados_raw.items()}
-
-    except Exception as e:
-        logger.error(f"⚠️ Erro Crítico IA: {traceback.format_exc()}")
-        return jsonify({'erro': f'Falha processamento IA: {str(e)}'}), 500
-
-    # --- 2. EXECUÇÃO ---
-    logs_acao = []
-    webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
-    
-    if not webhook_create_url:
-        logger.warning("⚠️ [ENV] N8N_WEBHOOK_TASKS não está definida ou está vazia!")
-
-    try:
-        # A. SHOPPING
-        for item in dados.get('shopping', []):
-            nome = item.get('nome', '').lower().strip()
-            if not nome: continue 
+        # Módulo Shopping
+        if 'shopping' in dados_json and dados_json['shopping']:
+            logs_acao.extend(_handle_shopping(dados_json['shopping'], usuario))
             
-            cat_raw = item.get('cat', 'OUTROS').upper()
-            mapa_cats = {'FRUTAS': 'HORTIFRÚTI', 'LEGUMES': 'HORTIFRÚTI', 'LIMPEZA': 'LIMPEZA', 'CARNE': 'CARNES'}
-            cat_nome = mapa_cats.get(cat_raw, cat_raw)
-
-            cat = Categoria.query.filter_by(nome=cat_nome).first()
-            if not cat: cat = Categoria(nome=cat_nome); db.session.add(cat); db.session.flush()
+        # Módulo Tasks
+        if 'tasks' in dados_json and dados_json['tasks']:
+            logs_acao.extend(_handle_tasks(dados_json['tasks'], usuario))
             
-            prod = Produto.query.filter_by(nome=nome).first()
-            if not prod:
-                prod = Produto(nome=nome, categoria_id=cat.id, emoji=item.get('emoji', '📦'))
-                db.session.add(prod); db.session.flush()
-            
-            existe = ListaItem.query.filter(ListaItem.produto_id == prod.id, ListaItem.status.in_(['pendente', 'comprado'])).first()
-            if not existe:
-                db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="omniscient"))
-                logs_acao.append(f"🛒 Add: {nome}")
-            else:
-                logs_acao.append(f"⚠️ Já existe: {nome}")
+        # Módulo Reminders
+        if 'reminders' in dados_json and dados_json['reminders']:
+            logs_acao.extend(_handle_reminders(dados_json['reminders'], usuario, data_hoje_iso))
 
-        # B. TASKS
-        for task in dados.get('tasks', []):
-            desc = task.get('desc', '').strip()
-            if not desc: continue 
-            
-            resp_raw = task.get('resp', usuario).capitalize()
-            r_low = resp_raw.lower()
-            if 'debora' in r_low or 'débora' in r_low or 'ela' in r_low: resp = 'Debora'
-            elif 'thiago' in r_low or 'ele' in r_low: resp = 'Thiago'
-            elif 'casal' in r_low or 'nos' in r_low or 'nós' in r_low: resp = 'Casal'
-            else: resp = resp_raw
-
-            try: prio = int(task.get('prio', 1))
-            except: prio = 1
-
-            existe = Task.query.filter_by(descricao=desc, responsavel=resp, status='pendente').first()
-            if not existe:
-                db.session.add(Task(descricao=desc, responsavel=resp, prioridade=prio))
-                logs_acao.append(f"✅ Task ({resp}): {desc}")
-
-        # C. REMINDERS
-        for rem in dados.get('reminders', []):
-            title = rem.get('title', '').strip()
-            if not title: continue 
-            date_str = rem.get('date', data_hoje_iso)
-            time_str = rem.get('time')
-            
-            if date_str:
-                try:
-                    dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-                    if time_str:
-                        tm = datetime.datetime.strptime(time_str, "%H:%M").time()
-                        full_dt = datetime.datetime.combine(dt, tm)
-                        iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
-                    else:
-                        full_dt = datetime.datetime.combine(dt, datetime.time.min)
-                        iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
-
-                    novo_rem = Reminder(title=title, notes=rem.get('notes',''), due_date=full_dt, status='needsAction', usuario=usuario)
-                    db.session.add(novo_rem); db.session.flush()
-                    logs_acao.append(f"🔔 Reminder: {title}")
-
-                    # --- DEBUG N8N ---
-                    if webhook_create_url:
-                        payload = {"action": "create", "local_id": novo_rem.id, "title": title, "due": iso_google}
-                        logger.info(f"🚀 [CREATE] Enviando para N8N: {webhook_create_url} | Payload: {payload}")
-                        try:
-                            resp = requests.post(webhook_create_url, json=payload, timeout=5)
-                            logger.info(f"📬 [CREATE] Resposta N8N: {resp.status_code} - {resp.text}")
-                        except Exception as e_req:
-                             logger.error(f"❌ [CREATE] Erro conexao N8N: {e_req}")
-
-                except Exception as e:
-                    logger.error(f"❌ Erro date reminder: {e}")
-
+        # Commit final único
         db.session.commit()
-        msg_final = "\n".join(logs_acao) if logs_acao else "Sem ações identificadas."
+        
+        msg_final = "\n".join(logs_acao) if logs_acao else "Nenhuma ação identificada."
         return jsonify({'message': msg_final}), 201
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Erro Geral Banco: {traceback.format_exc()}")
-        return jsonify({'erro': str(e)}), 500
+        logger.error(f"⚠️ Erro Crítico Processamento: {traceback.format_exc()}")
+        return jsonify({'erro': f'Falha no processamento: {str(e)}'}), 500
+
+# --- FUNÇÕES AUXILIARES (Private Methods) ---
+
+def _call_ai_extraction(texto, usuario, str_agora, data_hoje_iso):
+    """Encapsula a lógica de prompt e chamada ao Gemini"""
+    
+    template_str = """
+    Você é o cérebro do FamilyOS. Sua função é classificar e estruturar intenções.
+
+    CONTEXTO:
+    - Data Atual: {data_atual}
+    - Usuário Remetente: {usuario}
+
+    🚨 REGRAS DE DESAMBIGUAÇÃO (SHOPPING vs TASKS):
+    1. O verbo "Comprar" seguido de itens de supermercado (pão, leite, carne, detergente) -> DEVE ir para 'SHOPPING'.
+    2. O verbo "Comprar" seguido de bens duráveis ou genéricos (TV, presente, carro) -> DEVE ir para 'TASKS'.
+    3. Itens soltos sem verbo (ex: "Tomate, Alface") -> Assumir 'SHOPPING'.
+
+    REGRAS DE ATRIBUIÇÃO (Quem fará?):
+    1. Nome citado explicitamente ("Débora, ...") -> Débora.
+    2. Contexto "Nós/Casal" -> Casal.
+    3. Padrão -> O remetente ({usuario}).
+
+    ESTRUTURA DE SAÍDA (JSON):
+    {{
+        "shopping": [ {{ "nome": "Leite", "cat": "LATICINIOS", "qty": 2 }} ],
+        "tasks": [ {{ "desc": "Comprar presente da mãe", "resp": "Thiago", "prio": 2 }} ],
+        "reminders": [ {{ "title": "Médico", "date": "YYYY-MM-DD", "time": "HH:MM" }} ]
+    }}
+
+    ENTRADA DO USUÁRIO: "{texto}"
+    
+    Responda APENAS o JSON válido.
+    """
+    
+    prompt = ChatPromptTemplate.from_template(template_str)
+    chain = prompt | llm_gemini
+    
+    logger.info(f"🤖 [IA] Processando: {texto[:50]}...")
+    res = chain.invoke({
+        "data_atual": str_agora,
+        "texto": texto,
+        "usuario": usuario
+    })
+    
+    # Limpeza do JSON
+    clean_json = re.sub(r'```json|```', '', res.content).strip()
+    if not clean_json.startswith('{'):
+        match = re.search(r'\{.*\}', clean_json, re.DOTALL)
+        if match: clean_json = match.group(0)
+        
+    return json.loads(clean_json)
+
+def _handle_shopping(itens, usuario):
+    logs = []
+    for item in itens:
+        nome = item.get('nome', '').strip()
+        if not nome: continue
+        
+        # Normalização de categoria
+        cat_raw = item.get('cat', 'OUTROS').upper()
+        mapa_cats = {'FRUTAS': 'HORTIFRÚTI', 'LEGUMES': 'HORTIFRÚTI', 'LIMPEZA': 'LIMPEZA', 'CARNE': 'CARNES', 'PADARIA': 'PADARIA'}
+        cat_nome = mapa_cats.get(cat_raw, cat_raw)
+
+        # Lógica de Banco (Find or Create)
+        cat = Categoria.query.filter_by(nome=cat_nome).first()
+        if not cat: 
+            cat = Categoria(nome=cat_nome)
+            db.session.add(cat)
+            db.session.flush()
+        
+        prod = Produto.query.filter_by(nome=nome).first()
+        if not prod:
+            prod = Produto(nome=nome, categoria_id=cat.id, emoji=item.get('emoji', '📦'))
+            db.session.add(prod)
+            db.session.flush()
+        
+        # Verifica duplicidade na lista ativa
+        existe = ListaItem.query.filter(
+            ListaItem.produto_id == prod.id, 
+            ListaItem.status.in_(['pendente', 'comprado'])
+        ).first()
+        
+        if not existe:
+            # Add com origem "voice_ia"
+            db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="voice_ia"))
+            logs.append(f"🛒 Add: {nome}")
+        else:
+            logs.append(f"⚠️ Já na lista: {nome}")
+    return logs
+
+def _handle_tasks(tasks, usuario):
+    logs = []
+    for task in tasks:
+        desc = task.get('desc', '').strip()
+        if not desc: continue
+        
+        # Normalização Responsável
+        resp_raw = task.get('resp', usuario).capitalize()
+        if any(x in resp_raw.lower() for x in ['debora', 'débora', 'ela']): resp = 'Debora'
+        elif any(x in resp_raw.lower() for x in ['thiago', 'ele']): resp = 'Thiago'
+        elif any(x in resp_raw.lower() for x in ['casal', 'nos', 'nós']): resp = 'Casal'
+        else: resp = resp_raw
+
+        try: prio = int(task.get('prio', 1))
+        except: prio = 1
+
+        existe = Task.query.filter_by(descricao=desc, responsavel=resp, status='pendente').first()
+        if not existe:
+            db.session.add(Task(descricao=desc, responsavel=resp, prioridade=prio))
+            logs.append(f"✅ Task ({resp}): {desc}")
+    return logs
+
+def _handle_reminders(reminders, usuario, data_hoje_iso):
+    logs = []
+    webhook_create_url = os.getenv('N8N_WEBHOOK_TASKS', '').strip()
+    
+    for rem in reminders:
+        title = rem.get('title', '').strip()
+        if not title: continue
+        
+        date_str = rem.get('date', data_hoje_iso)
+        time_str = rem.get('time')
+        
+        try:
+            # Lógica de Data/Hora para Google Calendar format
+            dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+            if time_str:
+                tm = datetime.datetime.strptime(time_str, "%H:%M").time()
+                full_dt = datetime.datetime.combine(dt, tm)
+                iso_google = full_dt.strftime('%Y-%m-%dT%H:%M:%S-03:00')
+            else:
+                full_dt = datetime.datetime.combine(dt, datetime.time.min)
+                iso_google = full_dt.strftime('%Y-%m-%dT00:00:00-03:00')
+
+            novo_rem = Reminder(title=title, notes=rem.get('notes',''), due_date=full_dt, status='needsAction', usuario=usuario)
+            db.session.add(novo_rem)
+            db.session.flush() # Necessário para gerar o ID
+            logs.append(f"🔔 Reminder: {title}")
+
+            # Disparo Assíncrono para N8N (Idealmente mover para Celery/Queue no futuro)
+            if webhook_create_url:
+                payload = {"action": "create", "local_id": novo_rem.id, "title": title, "due": iso_google}
+                try:
+                    requests.post(webhook_create_url, json=payload, timeout=2) # Timeout baixo para não travar request
+                except Exception as e_req:
+                    logger.error(f"❌ Falha envio N8N: {e_req}")
+
+        except Exception as e:
+            logger.error(f"❌ Erro processando data reminder: {e}")
+            
+    return logs
 
 @webhook_bp.route('/reminders/sync', methods=['POST'])
 def sync_reminders():
