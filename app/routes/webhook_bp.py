@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 webhook_bp = Blueprint('webhook', __name__)
 
 # --- CONFIGURAÇÃO DA IA ---
-# Instancia aqui para evitar recriação a cada request (Singleton pattern simples)
 try:
     llm_gemini = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash", 
@@ -55,7 +54,7 @@ def voice_process():
         # 1. INTELIGÊNCIA: Extração de Dados
         dados_json = _call_ai_extraction(texto_entrada, usuario, str_agora, data_hoje_iso)
         
-        # 2. ROTEAMENTO E EXECUÇÃO (Dividir e Conquistar)
+        # 2. ROTEAMENTO E EXECUÇÃO
         logs_acao = []
         
         # Módulo Shopping
@@ -87,26 +86,32 @@ def _call_ai_extraction(texto, usuario, str_agora, data_hoje_iso):
     """Encapsula a lógica de prompt e chamada ao Gemini"""
     
     template_str = """
-    Você é o cérebro do FamilyOS. Sua função é classificar e estruturar intenções.
+    Você é o cérebro do FamilyOS. Sua função é classificar e estruturar intenções do usuário.
 
     CONTEXTO:
     - Data Atual: {data_atual}
     - Usuário Remetente: {usuario}
 
-    🚨 REGRAS DE DESAMBIGUAÇÃO (SHOPPING vs TASKS):
-    1. O verbo "Comprar" seguido de itens de supermercado (pão, leite, carne, detergente) -> DEVE ir para 'SHOPPING'.
-    2. O verbo "Comprar" seguido de bens duráveis ou genéricos (TV, presente, carro) -> DEVE ir para 'TASKS'.
-    3. Itens soltos sem verbo (ex: "Tomate, Alface") -> Assumir 'SHOPPING'.
+    🚨 REGRAS DE DESAMBIGUAÇÃO (CRÍTICO):
+    1. SHOPPING (Lista de Compras):
+       - Se o verbo é "Comprar" e o item é um OBJETO FÍSICO (comida, ferramenta, móvel, peça) -> É SHOPPING.
+       - Exemplos: "Comprar pé da cama", "Comprar parafuso", "Comprar TV", "Comprar leite".
+       - Regra Mental: "Eu consigo colocar isso num carrinho de compras?" -> Sim = Shopping.
 
-    REGRAS DE ATRIBUIÇÃO (Quem fará?):
-    1. Nome citado explicitamente ("Débora, ...") -> Débora.
-    2. Contexto "Nós/Casal" -> Casal.
-    3. Padrão -> O remetente ({usuario}).
+    2. TASKS (Tarefas):
+       - Se a intenção é uma AÇÃO, SERVIÇO, CONSERTO ou PAGAMENTO.
+       - Exemplos: "Arrumar a cama", "Instalar a TV", "Pagar a conta", "Ligar para mãe".
+       - Verbo "Comprar" só é Task se for algo abstrato (ex: "Comprar passagens", "Comprar ações").
+
+    3. ATRIBUIÇÃO (Quem fará?):
+       - Nome explícito ("Débora, ...") -> Débora.
+       - "Nós/Casal" -> Casal.
+       - Padrão -> O remetente ({usuario}).
 
     ESTRUTURA DE SAÍDA (JSON):
     {{
-        "shopping": [ {{ "nome": "Leite", "cat": "LATICINIOS", "qty": 2 }} ],
-        "tasks": [ {{ "desc": "Comprar presente da mãe", "resp": "Thiago", "prio": 2 }} ],
+        "shopping": [ {{ "nome": "Pé da Cama", "cat": "OUTROS", "qty": 1 }} ],
+        "tasks": [ {{ "desc": "Arrumar o pé da cama", "resp": "Thiago", "prio": 2 }} ],
         "reminders": [ {{ "title": "Médico", "date": "YYYY-MM-DD", "time": "HH:MM" }} ]
     }}
 
@@ -141,7 +146,11 @@ def _handle_shopping(itens, usuario):
         
         # Normalização de categoria
         cat_raw = item.get('cat', 'OUTROS').upper()
-        mapa_cats = {'FRUTAS': 'HORTIFRÚTI', 'LEGUMES': 'HORTIFRÚTI', 'LIMPEZA': 'LIMPEZA', 'CARNE': 'CARNES', 'PADARIA': 'PADARIA'}
+        mapa_cats = {
+            'FRUTAS': 'HORTIFRÚTI', 'LEGUMES': 'HORTIFRÚTI', 
+            'LIMPEZA': 'LIMPEZA', 'CARNE': 'CARNES', 
+            'PADARIA': 'PADARIA', 'BEBIDAS': 'BEBIDAS'
+        }
         cat_nome = mapa_cats.get(cat_raw, cat_raw)
 
         # Lógica de Banco (Find or Create)
@@ -164,7 +173,6 @@ def _handle_shopping(itens, usuario):
         ).first()
         
         if not existe:
-            # Add com origem "voice_ia"
             db.session.add(ListaItem(produto_id=prod.id, quantidade=item.get('qty', 1), usuario=usuario, origem_input="voice_ia"))
             logs.append(f"🛒 Add: {nome}")
         else:
@@ -205,7 +213,6 @@ def _handle_reminders(reminders, usuario, data_hoje_iso):
         time_str = rem.get('time')
         
         try:
-            # Lógica de Data/Hora para Google Calendar format
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
             if time_str:
                 tm = datetime.datetime.strptime(time_str, "%H:%M").time()
@@ -217,14 +224,13 @@ def _handle_reminders(reminders, usuario, data_hoje_iso):
 
             novo_rem = Reminder(title=title, notes=rem.get('notes',''), due_date=full_dt, status='needsAction', usuario=usuario)
             db.session.add(novo_rem)
-            db.session.flush() # Necessário para gerar o ID
+            db.session.flush()
             logs.append(f"🔔 Reminder: {title}")
 
-            # Disparo Assíncrono para N8N (Idealmente mover para Celery/Queue no futuro)
             if webhook_create_url:
                 payload = {"action": "create", "local_id": novo_rem.id, "title": title, "due": iso_google}
                 try:
-                    requests.post(webhook_create_url, json=payload, timeout=2) # Timeout baixo para não travar request
+                    requests.post(webhook_create_url, json=payload, timeout=2)
                 except Exception as e_req:
                     logger.error(f"❌ Falha envio N8N: {e_req}")
 
