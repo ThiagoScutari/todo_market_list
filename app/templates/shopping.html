@@ -120,16 +120,15 @@
         fetch('/toggle_item/' + id, { method: 'POST' });
     }
 
-    // Limpar Carrinho (Botão Vermelho)
+    // Limpar Carrinho
     function clearCart() {
         if (confirm('Arquivar itens comprados?')) {
             fetch('/clear_cart', { method: 'POST' }).then(() => location.reload());
         }
     }
 
-    // --- LÓGICA DO MODAL (ADICIONAR & EDITAR) ---
+    // --- LOGICA DO MODAL ---
 
-    // Helper para botões +/-
     function adjustQty(delta) {
         const input = document.getElementById('eqty');
         let val = parseInt(input.value) || 1;
@@ -138,20 +137,16 @@
         input.value = val;
     }
 
-    // 1. Abrir Modal VAZIO (Adicionar)
     function openAddModal() {
-        document.getElementById('eid').value = ''; // ID vazio indica novo item
+        document.getElementById('eid').value = ''; 
         document.getElementById('enome').value = '';
-        document.getElementById('eqty').value = '1'; // Reset Qty
+        document.getElementById('eqty').value = '1';
         
         document.getElementById('modalTitle').innerText = 'NOVO ITEM';
         document.getElementById('editModal').classList.add('visible');
-        
-        // Foca no campo nome automaticamente
         setTimeout(() => document.getElementById('enome').focus(), 100);
     }
 
-    // 2. Abrir Modal PREENCHIDO (Editar - Long Press)
     let pressTimer;
     const cards = document.querySelectorAll('.product-card');
 
@@ -164,7 +159,6 @@
             }, 800);
         };
         const end = () => clearTimeout(pressTimer);
-
         card.addEventListener('mousedown', start);
         card.addEventListener('touchstart', start, {passive: true});
         card.addEventListener('mouseup', end);
@@ -175,21 +169,34 @@
 
     function openEditModal(card) {
         const id = card.dataset.id;
-        const qty = card.dataset.qty || 1; // Pega do atributo data
+        const qty = parseInt(card.dataset.qty) || 1; // Garante Inteiro
         
-        const fullText = card.querySelector('.product-name').innerText; 
-        // Regex aprimorada: Remove emoji e o padrão "2x " do início
-        let nome = fullText.replace(/^\d+x\s*/, '').replace(/^[^\w\sÀ-ÿ]+/, '').trim(); 
+        // CORREÇÃO DA DUPLICIDADE:
+        // O product-name contem: "2x" (span) + "Emoji" + "Nome"
+        // Vamos pegar APENAS o texto puro, ignorando spans e emojis
+        
+        // Clona o elemento para não estragar o original e remove o span de qtd
+        let cloneInfo = card.querySelector('.product-name').cloneNode(true);
+        let spanQty = cloneInfo.querySelector('span'); // O span do '2x'
+        if (spanQty && spanQty.innerText.includes('x')) {
+            spanQty.remove();
+        }
+
+        let fullText = cloneInfo.innerText; 
+        // Regex poderosa: Remove tudo que não for letra/número no começo (emojis)
+        // e faz trim.
+        // Ex: "📦 Leite" -> "Leite"
+        // Ex: "🥛 Leite Integral" -> "Leite Integral"
+        let nomeLimpo = fullText.replace(/^[^\w\sÀ-ÿ]+/, '').trim(); 
 
         document.getElementById('eid').value = id;
-        document.getElementById('enome').value = nome;
+        document.getElementById('enome').value = nomeLimpo;
         document.getElementById('eqty').value = qty;
         
         document.getElementById('modalTitle').innerText = 'EDITAR ITEM';
         document.getElementById('editModal').classList.add('visible');
     }
 
-    // 3. Salvar (Unified Handler)
     document.getElementById('editForm').onsubmit = async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
@@ -203,7 +210,6 @@
 
         try {
             let url = id ? '/update_item' : '/shopping/add';
-            // Payload atualizado: Nome e Quantidade apenas
             const body = JSON.stringify({ id: id, nome: nome, quantidade: qty });
 
             const res = await fetch(url, {
