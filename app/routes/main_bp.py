@@ -118,6 +118,56 @@ def shopping_list():
         })
     return render_template('shopping.html', categorias=view, active_page='shopping')
 
+@main_bp.route('/shopping/add', methods=['POST'])
+@login_required
+def add_shopping_item():
+    data = request.get_json()
+    nome = data.get('nome', '').strip()
+    cat_nome = data.get('categoria', 'OUTROS').upper()
+    
+    if not nome:
+        return jsonify({'error': 'Nome é obrigatório'}), 400
+
+    try:
+        # 1. Busca ou Cria Categoria
+        categoria = Categoria.query.filter_by(nome=cat_nome).first()
+        if not categoria:
+            categoria = Categoria(nome=cat_nome)
+            db.session.add(categoria)
+            db.session.flush()
+
+        # 2. Busca ou Cria Produto
+        produto = Produto.query.filter_by(nome=nome).first()
+        if not produto:
+            # Tenta um emoji padrão ou deixa para a IA corrigir depois
+            produto = Produto(nome=nome, categoria_id=categoria.id, emoji='📦')
+            db.session.add(produto)
+            db.session.flush()
+
+        # 3. Adiciona na Lista (Se já não estiver lá)
+        item_existente = ListaItem.query.filter_by(
+            produto_id=produto.id, 
+            usuario=current_user.username
+        ).filter(ListaItem.status.in_(['pendente', 'comprado'])).first()
+
+        if item_existente:
+            if item_existente.status == 'comprado':
+                item_existente.status = 'pendente' # Reativa o item
+                msg = "Item reativado na lista!"
+            else:
+                msg = "Item já está na lista."
+        else:
+            novo_item = ListaItem(produto_id=produto.id, usuario=current_user.username)
+            db.session.add(novo_item)
+            msg = "Item adicionado!"
+
+        db.session.commit()
+        return jsonify({'message': msg, 'status': 'success'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @main_bp.route('/tasks')
 @login_required
 def task_board():
