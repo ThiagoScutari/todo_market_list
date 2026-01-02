@@ -97,6 +97,7 @@ def _call_ai_extraction(texto, usuario, str_agora, data_hoje_iso):
        - Se o verbo é "Comprar" e o item é um OBJETO FÍSICO (comida, ferramenta, móvel, peça) -> É SHOPPING.
        - Exemplos: "Comprar pé da cama", "Comprar parafuso", "Comprar TV", "Comprar leite".
        - Regra Mental: "Eu consigo colocar isso num carrinho de compras?" -> Sim = Shopping.
+       - 🎨 EMOJI: Para CADA item, gere um campo "emoji" que ilustre o produto (ex: "🍌", "🥩", "🪛", "📺").
 
     2. TASKS (Tarefas):
        - Se a intenção é uma AÇÃO, SERVIÇO, CONSERTO ou PAGAMENTO.
@@ -110,7 +111,7 @@ def _call_ai_extraction(texto, usuario, str_agora, data_hoje_iso):
 
     ESTRUTURA DE SAÍDA (JSON):
     {{
-        "shopping": [ {{ "nome": "Pé da Cama", "cat": "OUTROS", "qty": 1 }} ],
+        "shopping": [ {{ "nome": "Pé da Cama", "cat": "OUTROS", "qty": 1, "emoji": "🛏️" }} ],
         "tasks": [ {{ "desc": "Arrumar o pé da cama", "resp": "Thiago", "prio": 2 }} ],
         "reminders": [ {{ "title": "Médico", "date": "YYYY-MM-DD", "time": "HH:MM" }} ]
     }}
@@ -162,7 +163,9 @@ def _handle_shopping(itens, usuario):
         
         prod = Produto.query.filter_by(nome=nome).first()
         if not prod:
-            prod = Produto(nome=nome, categoria_id=cat.id, emoji=item.get('emoji', '📦'))
+            # Pega o emoji gerado pela IA ou usa fallback
+            emoji_ia = item.get('emoji', '📦')
+            prod = Produto(nome=nome, categoria_id=cat.id, emoji=emoji_ia)
             db.session.add(prod)
             db.session.flush()
         
