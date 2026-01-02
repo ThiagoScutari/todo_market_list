@@ -69,14 +69,10 @@ def get_weather_data():
 def _smart_categorize(nome_produto):
     """
     Tenta adivinhar a categoria sem chamar a IA pesada.
-    1. Verifica histórico (Memória).
-    2. Verifica palavras-chave (Regras Rápidas).
-    3. Fallback para 'OUTROS'.
     """
     nome = nome_produto.lower().strip()
     
-    # 1. Memória Muscular (Já comprei isso antes?)
-    # Busca qualquer produto com esse nome que já tenha categoria definida
+    # 1. Memória Muscular
     prod_existente = Produto.query.filter(Produto.nome.ilike(nome_produto)).first()
     if prod_existente and prod_existente.categoria:
         return prod_existente.categoria.nome
@@ -99,7 +95,6 @@ def _smart_categorize(nome_produto):
     return 'OUTROS'
 
 # --- ROTAS DE VISUALIZAÇÃO (GET) ---
-
 @main_bp.route('/')
 @login_required
 def index():
@@ -107,9 +102,11 @@ def index():
     temp = weather['results']['temp'] if weather else "--"
     desc = weather['results']['description'] if weather else "Indisponível"
     
-    # Resumo Rápido
+    # Resumo Rápido (Counts)
     shopping_count = ListaItem.query.filter_by(status='pendente').count()
     tasks_count = Task.query.filter_by(status='pendente').count()
+    # ADICIONADO: Contagem de lembretes não concluídos
+    reminders_count = Reminder.query.filter(Reminder.status != 'completed').count()
     
     return render_template('dashboard.html', 
                          usuario=current_user.username,
@@ -118,15 +115,17 @@ def index():
                          desc=desc,
                          shopping_count=shopping_count,
                          tasks_count=tasks_count,
+                         reminders_count=reminders_count, # Passando para o template
                          active_page='home')
 
 @main_bp.route('/shopping')
 @login_required
 def shopping_list():
-    # Carrega itens pendentes/comprados com join otimizado
+    # CORREÇÃO AQUI: Troquei 'ListaItem.created_at' por 'ListaItem.id'
+    # O uso do 'id' para ordenação assume que IDs maiores foram criados depois (sequencial)
     itens = ListaItem.query.options(joinedload(ListaItem.produto).joinedload(Produto.categoria)) \
              .filter(ListaItem.status.in_(['pendente', 'comprado'])) \
-             .order_by(ListaItem.status.desc(), ListaItem.created_at.desc()).all()
+             .order_by(ListaItem.status.desc(), ListaItem.id.desc()).all()
 
     # Agrupa por Categoria
     categorias = {}
@@ -135,19 +134,23 @@ def shopping_list():
         if cat_nome not in categorias:
             categorias[cat_nome] = []
         
-        # Formata para o template
         emoji = item.produto.emoji if item.produto.emoji else '📦'
         # Adiciona a quantidade no objeto para acesso fácil no template
         item.qty_display = item.quantidade 
+        
+        # Como ListaItem não tem created_at, usamos uma string fixa ou removemos o detalhe
+        # Se quiser data, teria que adicionar migration. Por hora, deixamos vazio ou data de hoje.
+        # Ajuste: removendo created_at do display por enquanto para evitar outro erro.
+        detalhes_str = "Lista" 
         
         categorias[cat_nome].append({
             'id': item.id,
             'nome': item.produto.nome,
             'emoji': emoji,
             'usuario': item.usuario,
-            'detalhes': item.created_at.strftime('%d/%m'),
+            'detalhes': detalhes_str, 
             'status': item.status,
-            'quantidade': item.quantidade  # Passando a quantidade explicitamente
+            'quantidade': item.quantidade
         })
 
     return render_template('shopping.html', categorias=categorias, active_page='shopping')
@@ -187,15 +190,9 @@ def login():
 @main_bp.route('/shopping/add', methods=['POST'])
 @login_required
 def add_shopping_item():
-    """
-    Adiciona item manualmente.
-    - Categoria: Auto-detectada (_smart_categorize).
-    - Quantidade: Recebida ou padrão 1.
-    """
     data = request.get_json()
     nome = data.get('nome', '').strip()
     
-    # Tratamento seguro da quantidade
     try:
         qty = int(data.get('quantidade', 1))
         if qty < 1: qty = 1
@@ -206,31 +203,26 @@ def add_shopping_item():
         return jsonify({'error': 'Nome é obrigatório'}), 400
 
     try:
-        # 1. Inteligência: Define a Categoria Automaticamente
         cat_nome = _smart_categorize(nome)
         
-        # 2. Busca ou Cria Categoria
         categoria = Categoria.query.filter_by(nome=cat_nome).first()
         if not categoria:
             categoria = Categoria(nome=cat_nome)
             db.session.add(categoria)
             db.session.flush()
 
-        # 3. Busca ou Cria Produto
         produto = Produto.query.filter_by(nome=nome).first()
         if not produto:
             produto = Produto(nome=nome, categoria_id=categoria.id, emoji='📦')
             db.session.add(produto)
             db.session.flush()
 
-        # 4. Adiciona/Atualiza na Lista
         item_existente = ListaItem.query.filter_by(
             produto_id=produto.id, 
             usuario=current_user.username
         ).filter(ListaItem.status.in_(['pendente', 'comprado'])).first()
 
         if item_existente:
-            # Se já existe, atualizamos a quantidade e reativamos se necessário
             item_existente.quantidade = qty 
             if item_existente.status == 'comprado':
                 item_existente.status = 'pendente'
@@ -252,13 +244,10 @@ def add_shopping_item():
 @main_bp.route('/update_item', methods=['POST'])
 @login_required
 def update_item():
-    """
-    Atualiza um item existente (Nome, Categoria ou Quantidade).
-    """
     data = request.get_json()
     item_id = data.get('id')
     nome = data.get('nome')
-    cat_nome = data.get('categoria') # Opcional agora
+    cat_nome = data.get('categoria') 
     
     try:
         qty = int(data.get('quantidade', 1))
@@ -270,23 +259,18 @@ def update_item():
     if not item: return jsonify({'error': 'Item não encontrado'}), 404
 
     try:
-        # Atualiza Nome do Produto
         if nome and nome != item.produto.nome:
-            # Verifica se já existe outro produto com esse nome para não duplicar
             prod_existente = Produto.query.filter_by(nome=nome).first()
             if prod_existente:
                 item.produto = prod_existente
             else:
-                # Renomeia o produto atual (Simples)
                 item.produto.nome = nome
         
-        # Atualiza Categoria (Se fornecida)
         if cat_nome:
             cat = Categoria.query.filter_by(nome=cat_nome).first()
             if cat:
                 item.produto.categoria = cat
 
-        # Atualiza Quantidade
         item.quantidade = qty
         
         db.session.commit()
@@ -307,11 +291,7 @@ def toggle_item(item_id):
 @main_bp.route('/clear_cart', methods=['POST'])
 @login_required
 def clear_cart():
-    # Arquiva apenas os itens do usuário atual ou todos? 
-    # Modelo atual: Itens "pendente/comprado" ficam visíveis. 
-    # Clear move 'comprado' -> 'arquivado'
-    
-    # Itens comprados viram 'arquivado' (soft delete da view)
+    # Itens comprados viram 'arquivado'
     ListaItem.query.filter_by(status='comprado').update({'status': 'arquivado'})
     db.session.commit()
     return jsonify({'success': True})
