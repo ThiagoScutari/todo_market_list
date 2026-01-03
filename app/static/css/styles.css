@@ -103,7 +103,7 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     padding: 16px;
     border: 1px solid var(--neon-r);
     border-radius: 50px; /* Pílula */
-    box-shadow: 0 0 15px rgba(255, 49, 49, 0.2); /* <--- O BRILHO ESTÁ AQUI */
+    box-shadow: 0 0 15px rgba(255, 49, 49, 0.2);
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
@@ -114,7 +114,7 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
 
 .btn-clear-large:active {
     transform: scale(0.98);
-    box-shadow: 0 0 25px rgba(255, 49, 49, 0.6); /* Brilha mais ao clicar */
+    box-shadow: 0 0 25px rgba(255, 49, 49, 0.6);
 }
 
 /* --- MODAL CYBERPUNK (PADRÃO GLOBAL) --- */
@@ -168,19 +168,14 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
 }
 
 /* --- REFINAMENTO DOS CAMPOS (INPUTS E SELECTS) --- */
-
-/* 1. Regra Geral para Todos os Campos do Modal */
 .modal-box input,
 .modal-box select {
     width: 100%;
     background-color: rgba(255, 255, 255, 0.05);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    
-    /* Perfeccionismo: Mais arredondado e com sombra */
     border-radius: 12px; 
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); 
-    
     padding: 12px;
     font-size: 1rem;
     margin-bottom: 20px;
@@ -188,49 +183,41 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     transition: all 0.3s ease;
 }
 
-/* 2. Efeito de Foco (Brilho Roxo) */
 .modal-box input:focus,
 .modal-box select:focus {
     border-color: var(--neon-p);
-    box-shadow: 0 0 15px rgba(97, 26, 240, 0.3); /* Glow Roxo */
+    box-shadow: 0 0 15px rgba(97, 26, 240, 0.3);
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-/* 3. CORREÇÃO: Remover seta forçada dos Inputs de Texto (Nome, Descrição) */
 .modal-box input {
-    background-image: none !important; /* Garante que não tenha ícone */
-    -webkit-appearance: none; /* Remove estilos nativos do browser */
+    background-image: none !important;
+    -webkit-appearance: none;
 }
 
-/* 4. Estilo Exclusivo dos SELECTS (Com a Seta Personalizada) */
 .modal-box select {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
     cursor: pointer;
-    
-    /* Seta Branca Minimalista */
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
     background-repeat: no-repeat;
     background-position: right 12px center;
     background-size: 16px;
-    padding-right: 40px; /* Espaço para o ícone não ficar em cima do texto */
+    padding-right: 40px;
 }
 
-/* 5. Estilo das Opções (Dropdown aberto) */
-/* Nota: Browsers limitam muito o estilo aqui, mas garantimos o fundo escuro */
 .modal-box select option {
-    background-color: #181820; /* Fundo Cyberpunk Escuro */
+    background-color: #181820;
     color: white;
     padding: 12px;
 }
 
-/* Botão Salvar (Verde Neon) */
 .btn-save {
     width: 100%;
     padding: 14px;
     background: var(--neon-g);
-    color: #000; /* Texto preto para contraste */
+    color: #000;
     border: none;
     border-radius: 8px;
     font-weight: 800;
@@ -252,19 +239,20 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     text-decoration: underline;
     font-size: 0.9rem;
 }
-/* --- NOVO: BARRA DE NAVEGAÇÃO INFERIOR --- */
+
+/* --- BARRA DE NAVEGAÇÃO INFERIOR --- */
 .bottom-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    background: rgba(5, 5, 9, 0.95); /* Quase preto opaco */
+    background: rgba(5, 5, 9, 0.95);
     backdrop-filter: blur(15px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-around;
     align-items: center;
-    padding: 12px 0 25px 0; /* Padding extra embaixo para iOS */
+    padding: 12px 0 25px 0;
     z-index: 2000;
 }
 
@@ -286,7 +274,7 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
 }
 
 .nav-item.active {
-    color: var(--neon-p); /* Roxo Neon */
+    color: var(--neon-p);
 }
 
 .nav-item.active i {
@@ -294,11 +282,11 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     filter: drop-shadow(0 0 8px rgba(97, 26, 240, 0.5));
 }
 
-/* --- NOVO: WIDGET DE CLIMA NO HEADER --- */
+/* --- WIDGET DE CLIMA --- */
 .weather-widget {
     font-size: 0.9rem;
     margin-right: 15px;
-    color: var(--neon-g); /* Verde Neon */
+    color: var(--neon-g);
     font-weight: 600;
     background: rgba(34, 255, 122, 0.1);
     padding: 4px 8px;
@@ -332,63 +320,36 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     background-color: #22ff7a;
 }
 
-/* --- FAB GROUP (Botões Flutuantes) --- */
-.fab-group {
-    position: fixed;
-    bottom: 90px; /* Acima da Navbar */
-    right: 20px;
-    display: flex;
-    gap: 15px; /* Espaço entre os botões */
-    z-index: 1000;
-}
-
-.fab-btn {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: none;
-    color: white;
-    font-size: 1.5rem; /* Aumentei levemente para ícone maior */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.fab-btn:active {
-    transform: scale(0.9);
-}
-
-/* --- NOVOS BOTÕES SHOPPING (Padrão Tasks) --- */
+/* --- NOVOS BOTÕES SHOPPING (Padrão Tasks - Pílula) --- */
 
 .action-buttons-grid {
     display: grid;
     grid-template-columns: 1fr 1fr; /* Divide em 2 colunas iguais */
     gap: 12px; /* Espaço entre os botões */
     margin-top: 20px;
-    padding: 0 5px; /* Pequeno respiro lateral */
+    padding: 0 5px;
 }
 
 /* Estilo Base da Pílula (Compartilhado) */
 .btn-action-pill {
     display: flex;
-    flex-direction: column; /* Ícone em cima do texto (ou row se preferir lado a lado) */
+    flex-direction: row; /* Ícone ao lado do texto (Padrão Pílula) */
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 12px;
-    border-radius: 16px; /* Borda arredondada suave */
+    padding: 10px; 
+    border-radius: 50px; /* <--- FORMATO DE PÍLULA */
     font-family: 'Inter', sans-serif;
-    font-weight: 800; /* Bold */
-    font-size: 0.75rem; /* Texto levemente menor para caber */
+    font-weight: 800;
+    font-size: 0.65rem; /* Ajustado para caber o texto */
     text-transform: uppercase;
     letter-spacing: 0.5px;
     cursor: pointer;
     backdrop-filter: blur(5px);
     transition: transform 0.2s, box-shadow 0.2s;
-    height: 80px; /* Altura fixa para ficarem iguais */
+    height: 54px; /* Altura padrão para pílula */
+    text-align: center;
+    line-height: 1.1;
 }
 
 .btn-action-pill:active {
@@ -396,7 +357,7 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
 }
 
 .btn-action-pill i {
-    font-size: 1.5rem; /* Ícone Grande */
+    font-size: 1.2rem;
 }
 
 /* Botão Verde (Adicionar) */
@@ -415,28 +376,13 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     box-shadow: 0 0 10px rgba(255, 49, 49, 0.1);
 }
 
-/* Botão Adicionar (Verde Neon) */
-.add-btn {
-    background: linear-gradient(135deg, #0f0, #0a0); 
-    box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
-    color: #000; /* Ícone preto para melhor leitura no verde */
-}
-
-/* Botão Arquivar (Vermelho/Padrão) */
-.archive-btn {
-    background: #1e1e24; /* Fundo escuro fixo */
-    border: 1px solid var(--neon-r); /* Borda vermelha usando sua var */
-    color: var(--neon-r); /* Ícone vermelho */
-    box-shadow: 0 0 10px rgba(255, 49, 49, 0.2);
-}
-
 /* --- CONTROLE DE QUANTIDADE (Stepper) --- */
 .qty-wrapper {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 24px;
-    justify-content: center; /* Centraliza no modal */
+    justify-content: center;
     background: rgba(255, 255, 255, 0.02);
     padding: 10px;
     border-radius: 16px;
@@ -465,7 +411,7 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
 }
 
 .qty-input {
-    width: 60px !important; /* Sobrescreve regra geral de input */
+    width: 60px !important;
     text-align: center;
     font-size: 1.4rem !important;
     font-weight: 700;
@@ -473,16 +419,14 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    color: var(--neon-g) !important; /* Verde Matrix */
+    color: var(--neon-g) !important;
 }
 
-/* Remove setas do input number (Chrome/Safari/Edge) */
 .qty-input::-webkit-outer-spin-button,
 .qty-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-/* Remove setas do input number (Firefox) */
 .qty-input[type=number] {
   -moz-appearance: textfield;
 }
