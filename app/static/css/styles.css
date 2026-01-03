@@ -361,6 +361,60 @@ header a { color: var(--text-sec); font-size: 1.4rem; }
     transform: scale(0.9);
 }
 
+/* --- NOVOS BOTÕES SHOPPING (Padrão Tasks) --- */
+
+.action-buttons-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Divide em 2 colunas iguais */
+    gap: 12px; /* Espaço entre os botões */
+    margin-top: 20px;
+    padding: 0 5px; /* Pequeno respiro lateral */
+}
+
+/* Estilo Base da Pílula (Compartilhado) */
+.btn-action-pill {
+    display: flex;
+    flex-direction: column; /* Ícone em cima do texto (ou row se preferir lado a lado) */
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 16px; /* Borda arredondada suave */
+    font-family: 'Inter', sans-serif;
+    font-weight: 800; /* Bold */
+    font-size: 0.75rem; /* Texto levemente menor para caber */
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 80px; /* Altura fixa para ficarem iguais */
+}
+
+.btn-action-pill:active {
+    transform: scale(0.96);
+}
+
+.btn-action-pill i {
+    font-size: 1.5rem; /* Ícone Grande */
+}
+
+/* Botão Verde (Adicionar) */
+.btn-add-green {
+    background: rgba(34, 255, 122, 0.1);
+    border: 1px solid var(--neon-g);
+    color: var(--neon-g);
+    box-shadow: 0 0 10px rgba(34, 255, 122, 0.1);
+}
+
+/* Botão Vermelho (Arquivar) */
+.btn-archive-red {
+    background: rgba(255, 49, 49, 0.1);
+    border: 1px solid var(--neon-r);
+    color: var(--neon-r);
+    box-shadow: 0 0 10px rgba(255, 49, 49, 0.1);
+}
+
 /* Botão Adicionar (Verde Neon) */
 .add-btn {
     background: linear-gradient(135deg, #0f0, #0a0); 

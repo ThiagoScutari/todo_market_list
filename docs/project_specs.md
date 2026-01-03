@@ -1,53 +1,43 @@
-# 🏗️ Documento Mestre de Arquitetura: FamilyOS
+# 📝 FamilyOS - Project Specifications
 
-**Versão:** v2.2 (Omniscient Sync)
-**Data da Revisão:** 12/12/2025
-**Status:** ✅ Produção (Estável)
-**Escopo:** Gestão Doméstica Unificada & Assistente Pessoal Híbrido
-
----
-
-## 1. Visão Estratégica
-
-### 1.1. O Conceito
-O **FamilyOS** é um Sistema Operacional da Casa projetado para centralizar a rotina familiar (Thiago & Débora). Ele atua como um hub central que orquestra dados de diferentes fontes (Google Tasks, APIs de Clima, Input de Voz) e oferece uma interface unificada e simplificada ("Zero Friction").
+**Versão:** 2.2 (Omniscient Sync + AI Core)
+**Data de Atualização:** 02/01/2026
+**Status:** Em Produção (Estável)
 
 ---
 
-## 2. Módulos Funcionais
+## 1. Visão Geral do Projeto
+O **FamilyOS** é um sistema de gestão doméstica centralizado ("Second Brain"), projetado para reduzir a carga cognitiva familiar. Ele unifica listas de compras, tarefas e lembretes em uma interface minimalista, alimentada por Inteligência Artificial para processamento de linguagem natural.
 
-### 2.1. 🏠 Dashboard (Hub Central)
-O ponto de partida da aplicação.
-* **Widget de Clima:** Integração com HG Brasil (via Cache de Banco para evitar Rate Limit). Exibe temperatura, condição e cidade (Itajaí, SC).
-* **Mensagem do Dia:** Frase inspiracional ou informativa rotativa.
-* **Acesso Rápido:** Cards de navegação para os outros módulos com badges de contagem de pendências.
+### 1.1. Filosofia "Single Source of Truth" (Fonte Única da Verdade)
+A arquitetura do sistema baseia-se no conceito de **IA Centralizada**. O serviço `AIAssistant` (baseado no Gemini) atua como o núcleo único de interpretação de intenções.
 
-### 2.2. 🛒 Mercado (Shopping)
-Gestão inteligente de suprimentos.
-* **Categorização:** Itens são organizados automaticamente (Hortifrúti, Padaria, Limpeza, etc.).
-* **Input:** Via Interface Web, Voz ou Texto.
-* **UX:** Checkbox circular grande para marcar comprados. Botão de "Limpar Carrinho" move itens para histórico.
-
-### 2.3. ✅ Tarefas (Tasks)
-Quadro de afazeres domésticos focados em execução.
-* **Atribuição Inteligente:** O sistema define o responsável automaticamente:
-    * *"Thiago precisa..."* ➝ Responsável: **Thiago**.
-    * *"Nós precisamos..."* ➝ Responsável: **Casal**.
-* **Priorização:** Classificação visual (🔴 Alta, 🟡 Média, 🟢 Baixa).
-
-### 2.4. 🔔 Lembretes (Google Sync) **[NOVO - Sprint 9]**
-Módulo de agenda e compromissos com data marcada.
-* **Sincronização Bidirecional:** Integração total com **Google Tasks** e **Google Calendar**.
-    * O que é criado no Google aparece no FamilyOS.
-    * O que é concluído/deletado no Google some do FamilyOS.
-* **Batch Processing:** O sistema recebe e processa listas inteiras de tarefas de uma só vez para alta performance.
-* **Gatilho Manual:** Botão "Sincronizar Agora" na interface que dispara o Webhook do n8n.
+Isso significa que todo input no sistema — seja um comando de voz complexo enviado via Telegram ou uma adição manual rápida pelo Web App — é processado pelo mesmo motor de inteligência. Isso garante consistência absoluta na categorização, geração de emojis e padronização de dados em todos os módulos.
 
 ---
 
-## 3. Arquitetura de Infraestrutura
+## 2. Arquitetura Técnica
 
-O projeto segue uma arquitetura moderna baseada em microsserviços containerizados, com fluxos distintos para desenvolvimento e produção.
+### 2.1. Backend (Core)
+* **Linguagem:** Python 3.11+
+* **Framework:** Flask (Blueprints: Auth, Main, API, Webhook)
+* **Banco de Dados:** PostgreSQL (SQLAlchemy ORM)
+* **IA Engine:** `AIAssistant` Service (Google Gemini 2.5 Flash)
+* **Gerenciador de Processos:** Gunicorn (Produção)
+
+### 2.2. Frontend (Interface)
+* **Renderização:** Server-Side (Jinja2)
+* **Estilização:** CSS Customizado (Cyberpunk/Glassmorphism Clean) + Bootstrap Icons
+* **Interatividade:** Vanilla JS (Fetch API) para operações assíncronas (AJAX)
+
+### 2.3. Integrações Externas
+* **n8n (Automação):** Hub central para Webhooks de Voz (Telegram/Whisper) e Sincronização de Lembretes (Google Tasks).
+* **HG Brasil:** API de Clima para o Dashboard.
+* **Google Tasks:** Fonte autoritativa para Lembretes.
+
+---
+
+## 3. Ambientes de Desenvolvimento
 
 ### 3.1. Ambiente de Homologação (Dev Local)
 Focado em agilidade e debug.
@@ -77,70 +67,75 @@ Focado em estabilidade e segurança.
 
 ---
 
-## 4. Stack Tecnológico
+## 4. Módulos Funcionais
 
-### 4.1. Front-End
-* **Linguagem:** HTML5, CSS3 (Vanilla), JavaScript (ES6).
-* **Template Engine:** Jinja2 (Server-side rendering).
-* **Design System:** Tema "Cyberpunk Dark Neon".
-    * Cores: Deep Void (`#050509`), Neon Purple (`#611af0`), Neon Green (`#22ff7a`).
-    * Componentes: Cards translúcidos (Glassmorphism), Inputs customizados, Badges dinâmicos.
-* **Interatividade:**
-    * **Long Press (800ms):** Abre modais de edição.
-    * **Vibração (Haptic Feedback):** Ao concluir tarefas.
-    * **Optimistic UI:** Atualiza a tela antes da resposta do servidor.
+### 🛒 4.1. Mercado (Shopping)
+Gerenciamento inteligente de lista de compras.
+* **Input Inteligente:** Adição de itens via texto (App) ou voz (Telegram) passa pela IA para inferir:
+    * **Categoria:** (ex: "Maçã" -> HORTIFRÚTI)
+    * **Emoji:** (ex: "Maçã" -> 🍎)
+    * **Quantidade:** Suporte nativo a inteiros (ex: "2x Leite").
+* **Funcionalidades:**
+    * Listagem agrupada por categorias.
+    * Edição rápida (Long Press) com sanitização de nome.
+    * Check/Uncheck e Arquivamento em massa ("Limpar Carrinho").
 
-### 4.2. Back-End
-* **Framework:** Python Flask.
-* **ORM:** SQLAlchemy.
-* **Servidor WSGI:** Gunicorn (Produção).
-* **Rotas Críticas:**
-    * `POST /voice/process`: Recebe transcrição de áudio, usa Gemini para categorizar e insere no banco.
-    * `POST /reminders/sync`: Endpoint inteligente que aceita listas puras (`[...]`) do n8n para sincronia em massa.
-    * `POST /chat/process`: (Em desenvolvimento) Interface de chat ativo.
+### ✅ 4.2. Tarefas (Tasks)
+Quadro Kanban para afazeres domésticos não agendados.
+* **Estrutura:** Dividido por Responsável (Thiago, Debora, Casal).
+* **Prioridade:** Sistema visual de urgência (Alta/Média/Baixa).
+* **Funcionalidades:**
+    * Visualização e Conclusão de tarefas.
+    * Edição de responsável e prioridade.
+    * Arquivamento de tarefas concluídas.
 
-### 4.3. Banco de Dados (PostgreSQL)
-Schema Relacional Normalizado.
+### ⏰ 4.3. Lembretes (Reminders)
+Visualizador unificado de compromissos datados.
+* **Modelo de Dados:** Espelho (*Mirror*) do Google Tasks.
+* **Política "Read-Only":** O Frontend do FamilyOS serve apenas para **visualização**.
+    * **Criação/Edição:** Deve ser feita via Google Tasks (Mobile/Web) ou Comando de Voz (que delega para o Google).
+    * **Sincronização:** Via Webhook (`/reminders/sync`) acionado pelo n8n.
 
-**Tabela: `reminders` (Atualizada)**
-| Coluna | Tipo | Função |
-| :--- | :--- | :--- |
-| `id` | SERIAL (PK) | Identificador local. |
-| `google_id` | VARCHAR | ID da tarefa no Google (Link de Sync). |
-| `title` | VARCHAR | Título do compromisso. |
-| `notes` | TEXT | Detalhes ou link para e-mail. |
-| `due_date` | TIMESTAMP | Data e hora do vencimento. |
-| `status` | VARCHAR | 'needsAction' ou 'completed'. |
-| `usuario` | VARCHAR | Quem criou/sincronizou. |
-| `last_updated` | TIMESTAMP | Controle de versão. |
+### 📊 4.4. Dashboard
+Painel central de "Situação do Dia".
+* **Saudação:** Personalizada com Clima atual (Itajaí, SC).
+* **Resumo:** Contadores de pendências (Compras, Tarefas, Lembretes).
+* **Inspiração:** Frase do dia aleatória.
 
 ---
 
-## 5. Automação e IA (O Cérebro)
+## 5. Fluxos de Dados (Data Flow)
 
-### 5.1. Fluxo de Sincronização (Google Tasks ↔ FamilyOS)
-Para resolver problemas de performance e timeouts, a arquitetura de sync foi refinada:
-1.  **Gatilho:** Cron (a cada 30min) OU Botão Manual no Front.
-2.  **n8n (Extração):** Node "Google Tasks" baixa todas as tarefas pendentes.
-3.  **n8n (Agregação):** Node "Item Lists" (Aggregate) compila as tarefas em uma única lista JSON (`tasks: [...]`).
-4.  **Envio:** Um único POST HTTP envia o pacote para o Python.
-5.  **Python:** Processa a lista, cria o que não existe, atualiza o que mudou e remove (Soft/Hard delete) o que foi concluído.
+### 5.1. Fluxo de Input Manual (Shopping)
+1.  Usuário digita "2 Pão de Queijo" no App.
+2.  Frontend envia POST `/shopping/add`.
+3.  Backend invoca `AIAssistant`.
+4.  IA processa -> JSON: `{ "nome": "Pão de Queijo", "qty": 2, "cat": "PADARIA", "emoji": "🥯" }`.
+5.  Backend salva no Banco.
+6.  Frontend recarrega.
 
-### 5.2. Processamento de Linguagem Natural (Gemini 2.5)
-O sistema não usa comandos rígidos ("Adicionar X em Y"). Ele entende intenção:
-* *Input:* "Lavar o carro e a reunião com a diretoria é amanhã às 14h."
-* *Processamento:* O Gemini separa em:
-    1.  **Task:** "Lavar o carro" (Prio: Média, Resp: Thiago).
-    2.  **Reminder:** "Reunião Diretoria" (Data: Amanhã 14:00).
+### 5.2. Fluxo de Sincronização (Lembretes)
+1.  Alteração ocorre no Google Tasks.
+2.  n8n detecta evento e envia Payload para POST `/reminders/sync`.
+3.  Backend atualiza/insere registros na tabela `reminders`.
+4.  Próximo acesso ao Dashboard reflete a mudança.
+
+---
+
+## 6. Estrutura de Banco de Dados (Resumo)
+
+* **Users:** `id, username, password_hash`
+* **Shopping (ListaItem):** `id, produto_id, quantidade (int), status, usuario`
+    * **Produto:** `id, nome, emoji, categoria_id`
+    * **Categoria:** `id, nome`
+* **Tasks:** `id, descricao, responsavel, prioridade, status`
+* **Reminders:** `id, google_id, title, due_date, status`
+* **WeatherCache:** `city, data_json, last_updated`
 
 ---
 
-## 6. Próximos Passos (Roadmap)
+## 7. Roadmap Futuro (Backlog)
 
-* [ ] **Módulo Chatbot:** Implementar interface de chat real-time (`chat.html`) substituindo o log estático.
-* [ ] **IA Ativa:** Permitir que o sistema pergunte coisas ("Você já comprou o leite que estava na lista?").
-* [ ] **Multi-usuário:** Refinar permissões para uso simultâneo intenso.
-
----
-**Autor:** Thiago Scutari & FamilyOS AI
-**Documentação Gerada Automaticamente**
+* **[Sprint 10] Refinamento de Lembretes:** Melhorar a visualização de datas (Hoje, Amanhã, Próximos) no Dashboard.
+* **[Sprint 11] Gestão de Estoque:** Mover itens comprados para uma "Despensa Virtual".
+* **[Sprint 12] Multi-usuário:** Refinar permissões e visualizações por usuário logado.

@@ -59,15 +59,19 @@
 
     <div style="height: 100px;"></div>
 
-    <div class="fab-group">
-        <button class="fab-btn add-btn" onclick="openAddModal()">
-            <i class="bi bi-plus-lg"></i>
+    <div class="action-buttons-grid">
+        <button class="btn-action-pill btn-add-green" onclick="openAddModal()">
+            <i class="bi bi-pencil-square"></i>
+            ADICIONAR ITENS
         </button>
         
         {% if categorias %}
-        <button class="fab-btn archive-btn" onclick="clearCart()">
+        <button class="btn-action-pill btn-archive-red" onclick="clearCart()">
             <i class="bi bi-archive"></i>
+            ARQUIVAR CONCLUÍDAS
         </button>
+        {% else %}
+        <div></div> 
         {% endif %}
     </div>
 
